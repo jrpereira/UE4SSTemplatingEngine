@@ -9,6 +9,7 @@ local function rejects(fn, part)
     checks = checks + 1
 end
 local categories = C.new(); categories:registerCategory('player', {'quickslots'})
+categories:setCategory('player.quickslots', {single=true})
 local template = {collection = 'Robustness', name = 'Lifecycle', category = 'player.quickslots',
     settings={enabled=true},
     actions = {A = {name = 'Alpha', slots = 1, type = 'any'}, B = {name = 'Beta', slots = 2, type = 'any'}}}
@@ -59,7 +60,8 @@ rejects(function() M.generate(registry, {catalog = {version = 1, next = 2, entri
 local reordered = M.generate(registry, {catalog = base.catalog, groupOrders = {[identity] = {'B', 'A'}}})
 local selected = next(base.selectors['player.quickslots'].byValue)
 local a, b = base.definitions['player.quickslots'][selected], reordered.definitions['player.quickslots'][selected]
-check(a.direct.A[1].key == b.direct.A[1].key and a.groups.B.key == b.groups.B.key)
+check(a.direct.A[1].key == 'TE_Slot1' and b.direct.A[1].key == 'TE_Slot3'
+    and a.groups.B.key == 'TE_Group2' and b.groups.B.key == 'TE_Group1')
 check(base.catalog.next == reordered.catalog.next)
 local defaults = {}
 for _, row in ipairs(base.rows) do defaults[row.Id] = tonumber(row.Default) end

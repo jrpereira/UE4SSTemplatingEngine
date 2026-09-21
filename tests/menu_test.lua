@@ -23,6 +23,8 @@ end
 local function registryFor(templates)
     local categories = Categories.new()
     categories:registerCategory('player', {'quickslots', 'stats'})
+    categories:setCategory('player.quickslots', {single=true})
+    categories:setCategory('player.stats', {single=true})
     local registry = Registry.new(categories, {execute = function() return templates end})
     registry:registerTemplate('fixture.lua'); registry:loadTemplatesFromRegister()
     return registry
@@ -55,7 +57,28 @@ for _, last in ipairs({2, 5}) do
     local selector = result.selectors['player.quickslots']
     local selected = next(selector.byValue)
     local definition = result.definitions['player.quickslots'][selected]
+    local scopePrefix = 'TE_'
+    check(definition.scope == nil)
+    check(selector.id == 'TE_Template' and definition.access == scopePrefix .. 'AccessMethod'
+        and definition.firstDefault == scopePrefix .. 'FirstGroupDefault')
+    check(definition.groups['1'].key == scopePrefix .. 'Group1'
+        and definition.groups['2'].key == scopePrefix .. 'Group2')
+    for slot = 1, 4 do
+        check(definition.direct['1'][slot].key == scopePrefix .. 'Slot' .. slot
+            and definition.direct['1'][slot].mode == scopePrefix .. 'Slot' .. slot .. 'Mode')
+        check(definition.direct['2'][slot].key == scopePrefix .. 'Slot' .. (slot + 4)
+            and definition.direct['2'][slot].mode == scopePrefix .. 'Slot' .. (slot + 4) .. 'Mode')
+    end
     check(model.items[indices[selector.id]].default==0 and definition.enabled==false)
+    check(model.items[indices[definition.access]].default == 1
+        and model.items[indices[definition.firstDefault]].default == 0)
+    check(model.items[indices[definition.groups['2'].key]].default == 164)
+    for slot = 1, 4 do
+        check(model.items[indices[definition.direct['1'][slot].key]].default == 48 + slot)
+        check(model.items[indices[definition.direct['1'][slot].mode]].default == 0)
+        check(model.items[indices[definition.direct['2'][slot].key]].default == 48 + slot)
+        check(model.items[indices[definition.direct['2'][slot].mode]].default == 1)
+    end
     check(model.items[indices[selector.id]].ammFont == 2)
     check(model.items[indices[definition.access]].ammFont == 2)
     check(model.items[indices[selector.id]].ammGroup.heading == false)
@@ -82,17 +105,19 @@ for _, last in ipairs({2, 5}) do
     end
     check(visibleKeys() == 0)
     model:set(indices[selector.id], selected)
-    check(visibleKeys() == 8 + last)
-    for _, slots in pairs(definition.direct) do
-        check(model.items[indices[slots[1].key]].ammGroup.font == 5)
-    end
-    model:set(indices[definition.access], 1)
     check(visibleKeys() == 3 + math.max(4, last))
     model:set(indices[definition.firstDefault], 1)
     check(visibleKeys() == 2 + math.max(4, last))
     local visible = model:visibility()
     check(not visible[indices[definition.groups['1'].key]])
     check(visible[indices[definition.groups['2'].key]])
+    model:set(indices[definition.access], 0)
+    check(visibleKeys() == 8 + last)
+    for _, slots in pairs(definition.direct) do
+        check(model.items[indices[slots[1].key]].ammGroup.font == 5)
+    end
+    model:set(indices[definition.access], 1)
+    check(visibleKeys() == 2 + math.max(4, last))
     local values = {}; for i, item in ipairs(model.items) do values[item.id] = model.pending[i] end
     local decoded = result.decode(values)['player.quickslots']
     check(decoded.id == selector.byValue[selected] and decoded.configuration.firstGroupDefault)
@@ -124,11 +149,36 @@ local ordinary = Menu.generate(registryFor(many))
 local model, indices = modelFor(ordinary, 'player.stats')
 check(not model.items[indices[ordinary.selectors['player.stats'].id]].ammTabs
     and ordinary.aggregate.rows[1].ammTabsWidth == nil)
+local multiCategories = Categories.new()
+multiCategories:registerCategory('other', {'unknown'})
+local multiRegistry = Registry.new(multiCategories, {execute=function() return {
+    {collection='Tests',name='First Attack',category='other.unknown',settings={enabled=false}},
+    {collection='Tests',name='Second Attack',category='other.unknown',settings={enabled=false}},
+    {collection='Tests',name='Third Attack',category='other.unknown',settings={enabled=false}},
+} end})
+multiRegistry:registerTemplate('multi.lua'); multiRegistry:loadTemplatesFromRegister()
+local multi = Menu.generate(multiRegistry)
+check(multi.selectors['other.unknown'] == nil and #multi.multiSelectors['other.unknown'] == 3)
+local multiById = {}
+for _, item in ipairs(multi.multiSelectors['other.unknown']) do multiById[item.id] = item end
+check(multiById.TE_CategorySeparator_FirstAttack ~= nil
+    and multiById.TE_CategorySeparator_SecondAttack ~= nil
+    and multiById.TE_CategorySeparator_ThirdAttack ~= nil)
+local multiModel, multiIndices = modelFor(multi, 'other.unknown')
+check(multiModel.items[multiIndices['TE_CategorySeparator_FirstAttack']].label == 'First Attack')
+local multiValues = {}; for i, item in ipairs(multiModel.items) do multiValues[item.id] = multiModel.pending[i] end
+check(#multi.decode(multiValues)['other.unknown'] == 0)
+multiValues.TE_CategorySeparator_FirstAttack = 1
+local activeMulti = multi.decode(multiValues)['other.unknown']
+check(#activeMulti == 1 and activeMulti[1].id == multiById.TE_CategorySeparator_FirstAttack.definition.id)
 local empty = Menu.generate(registryFor({}))
 check(#empty.rows == 0 and #empty.pages == 0 and #empty.warnings == 2
     and next(empty.pageByCategory) == nil and next(empty.selectors) == nil)
 local groupedCategories = Categories.new()
 groupedCategories:registerCategory('player', {'quickslots', 'stats', 'charges'})
+for _, category in ipairs({'quickslots','stats','charges'}) do
+    groupedCategories:setCategory('player.' .. category, {single=true})
+end
 groupedCategories:registerCategory('menu', {'controls', 'fixes', 'templates'})
 local groupedTemplates = {
     fixture(2),
@@ -140,7 +190,8 @@ groupedRegistry:registerTemplate('grouped.lua'); groupedRegistry:loadTemplatesFr
 local grouped = Menu.generate(groupedRegistry)
 check(#grouped.aggregate.rows == 3 and #grouped.pages == 3)
 check(grouped.aggregate.rows[1]._category == 'menu.fixes'
-    and grouped.aggregate.rows[1].Label == 'Fixes' and grouped.aggregate.rows[1].Group == 'Menu'
+    and grouped.aggregate.rows[1].Id == 'TE_CategorySeparator_MenuFix'
+    and grouped.aggregate.rows[1].Label == 'Menu Fix' and grouped.aggregate.rows[1].Group == 'Menu'
     and grouped.aggregate.rows[1].ammTabsWidth == 440)
 check(grouped.aggregate.rows[2]._category == 'player.quickslots'
     and grouped.aggregate.rows[2].Label == 'Quickslots' and grouped.aggregate.rows[2].Group == 'Player')

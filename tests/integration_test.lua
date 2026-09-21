@@ -10,7 +10,7 @@ local attaches, detached, rendered = 0, 0, nil
 function template:attach(context, target, spec, previous)
     check(target and target.kind=='switcher')
     attaches = attaches + 1
-    check(spec.access == 0)
+    check(spec.access == 1)
     return previous or {}
 end
 function template:detach() detached = detached + 1; return true end

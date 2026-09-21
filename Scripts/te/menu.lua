@@ -52,7 +52,32 @@ function M.generate(registry, options)
         return catalog.entries[name]
     end
     local function id(parts) return 'TE_' .. allocate(parts) end
-    local lines, rows, groups, bindings, selectors, warnings = {}, {}, {}, {}, {}, {}
+    local publicIds = {}
+    local function namedId(name, fallback)
+        local settingId = 'TE_' .. name
+        if publicIds[settingId] then settingId = id(fallback) end
+        publicIds[settingId] = true
+        return settingId
+    end
+    local function publicName(value)
+        local result = tostring(value):gsub('[^%w]+', ' ')
+            :gsub('(%a)([%w]*)', function(a, b) return a:upper() .. b end)
+            :gsub('%s+', '')
+        assert(result ~= '', 'public menu name is empty')
+        return result
+    end
+    local quickslotDefaults = options.quickslotDefaults or {swap = 164, slots = {49, 50, 51, 52}}
+    assert(type(quickslotDefaults) == 'table' and type(quickslotDefaults.slots) == 'table',
+        'quickslot defaults must define swap and slots')
+    assert(type(quickslotDefaults.swap) == 'number' and quickslotDefaults.swap >= 0
+        and quickslotDefaults.swap <= 254 and quickslotDefaults.swap % 1 == 0,
+        'quickslot swap default must be a key code')
+    for slot = 1, 4 do
+        local value = quickslotDefaults.slots[slot]
+        assert(type(value) == 'number' and value >= 0 and value <= 254 and value % 1 == 0,
+            'quickslot slot defaults must contain four key codes')
+    end
+    local lines, rows, groups, bindings, selectors, multiSelectors, warnings = {}, {}, {}, {}, {}, {}, {}
     local groupSections, groupOrder = {}, {}
     local aggregateGroups, aggregateGroupOrder = {}, {}
     local aggregateRows, pageRows, categoryLabels, currentCategory = {}, {}, {}, nil
@@ -77,15 +102,16 @@ function M.generate(registry, options)
         emit('Setting.' .. fields.Id, fields)
         return fields.Id
     end
-    local function picker(settingId, label, group, values, labels, source, visible, compact, level, tabsWidth)
+    local function picker(settingId, label, group, values, labels, source, visible, compact, level, tabsWidth, default)
         return row({Id = settingId, Label = text(label), Group = group, Type = 'picker',
-            PresetValues = table.concat(values, '|'), PresetLabels = table.concat(labels, '|'), Default = values[1],
+            PresetValues = table.concat(values, '|'), PresetLabels = table.concat(labels, '|'),
+            Default = default == nil and values[1] or default,
             VisibleWhen = source, VisibleValues = visible, ammLevel = level,
             ammType = compact and #values <= 8 and 'tab' or nil,
             ammTabsWidth = compact and #values <= 8 and tabsWidth or nil})
     end
-    local function group(identity, label, selector, selected, source, visible, level, heading)
-        local groupId = id({'group', identity})
+    local function group(identity, label, selector, selected, source, visible, level, heading, publicId)
+        local groupId = publicId and namedId(publicId, {'group', identity}) or id({'group', identity})
         if not groups[groupId] then
             groups[groupId] = true
             local fields = {VisibleWhen = source, VisibleValues = visible,
@@ -97,14 +123,15 @@ function M.generate(registry, options)
         end
         return groupId
     end
-    local function binding(identity, label, groupId, source, visible, modeValues)
-        local settingId = id({'binding', identity})
+    local function binding(identity, label, groupId, source, visible, modeValues, publicId, defaultKey, defaultMode)
+        local settingId = publicId and namedId(publicId, {'binding', identity}) or id({'binding', identity})
         local modeId = settingId .. 'Mode'
         row({Id = settingId, Type = 'integer', Label = text(label), Group = groupId,
-            Minimum = 0, Maximum = 254, Step = 1, Default = 0, ammType = 'keybind', Pair = modeId,
+            Minimum = 0, Maximum = 254, Step = 1, Default = defaultKey or 0, ammType = 'keybind', Pair = modeId,
             VisibleWhen = source, VisibleValues = visible})
         row({Id = modeId, Type = 'picker', Label = text(label .. ' mode'), Group = groupId,
-            PresetValues = table.concat(modeValues, '|'), PresetLabels = 'Tap|Hold', Default = modeValues[1],
+            PresetValues = table.concat(modeValues, '|'), PresetLabels = 'Tap|Hold',
+            Default = defaultMode == nil and modeValues[1] or defaultMode,
             ammType = 'keybind', VisibleWhen = source, VisibleValues = visible})
         bindings[identity] = {key = settingId, mode = modeId}
         return bindings[identity]
@@ -117,13 +144,7 @@ function M.generate(registry, options)
         perCategory[category] = perCategory[category] or {}
         table.insert(perCategory[category], entry)
     end
-    -- Persist the historical quickslots namespace so existing config keys and
-    -- selected template values survive the public category rename unchanged.
-    local function storageIdentity(entry)
-        if entry.template.category ~= 'player.quickslots' then return entry.id end
-        return U.identity({collection=entry.template.collection,
-            category='player.actions', name=entry.template.name})
-    end
+    local function storageIdentity(entry) return entry.id end
     local decoded = {}
     for _, category in ipairs(registry.categories:list()) do
         local categoryLabel = (options.categoryLabels or {})[category]
@@ -134,8 +155,9 @@ function M.generate(registry, options)
             warnings[#warnings + 1] = category .. ': empty category omitted; DMM cannot render a None-only picker'
         else
             currentCategory = category
+            local categorySingle = registry.categories:getCategory(category).single == true
             assert(#available <= 63, category .. ': more than 63 templates exceeds picker capacity including None')
-            local selector = id({'selector', category == 'player.quickslots' and 'player.actions' or category})
+            local selector
             local values, labels, byValue = {0}, {'None'}, {}
             for _, entry in ipairs(available) do
                 local value = allocate({'template', storageIdentity(entry)})
@@ -149,22 +171,46 @@ function M.generate(registry, options)
                 aggregateGroupOrder[#aggregateGroupOrder + 1] = aggregateGroup
                 emit('Category.' .. aggregateGroup, {})
             end
-            picker(selector, title(suffix), aggregateGroup, values, labels, nil, nil, true, 2, 440)
-            aggregateRows[#aggregateRows + 1] = rows[#rows]
-            selectors[category] = {id = selector, byValue = byValue}
+            if categorySingle then
+                local selectorName = category == 'player.quickslots' and 'Template'
+                    or publicName(category) .. 'Template'
+                selector = namedId(selectorName, {'selector', category})
+                picker(selector, title(suffix), aggregateGroup, values, labels, nil, nil, true, 2, 440)
+                aggregateRows[#aggregateRows + 1] = rows[#rows]
+                selectors[category] = {id = selector, byValue = byValue}
+            else
+                multiSelectors[category] = {}
+            end
             decoded[category] = {}
             for _, entry in ipairs(available) do
                 local template, identity = entry.template, storageIdentity(entry)
                 local value = allocate({'template', identity})
-                local definition = {id=entry.id,fields={},enabled=template.settings.enabled}
+                local templateScope
+                if not categorySingle then templateScope = publicName(template.name) end
+                local scopePrefix = templateScope and templateScope .. '_' or ''
+                local definition = {id=entry.id,scope=templateScope,fields={},enabled=template.settings.enabled}
                 decoded[category][value] = definition
+                local ownerSelector, ownerValue = selector, value
+                if not categorySingle then
+                    ownerSelector = namedId('CategorySeparator_' .. templateScope,
+                        {'template_toggle', identity})
+                    ownerValue = 1
+                    picker(ownerSelector, template.name, aggregateGroup, {0, 1}, {'No', 'Yes'},
+                        nil, nil, true, 2, 440, 0)
+                    aggregateRows[#aggregateRows + 1] = rows[#rows]
+                    multiSelectors[category][#multiSelectors[category] + 1] = {
+                        id=ownerSelector, value=value, definition=definition}
+                end
                 if category == 'player.quickslots' then
                     local ordered = V.orderedGroups(template, (options.groupOrders or {})[entry.id])
-                    local access = id({'access', identity})
-                    local accessGroup = group(key({identity, 'access'}), 'Access Method', selector, value, selector, value, 3, 0)
-                    picker(access, 'Access Method', accessGroup, {0, 1}, {'1 key per slot', 'Activate group first'}, nil, nil, true, 2)
-                    local default = id({'first_default', identity})
-                    picker(default, 'First group is default (needs no key)', accessGroup, {0, 1}, {'Off', 'On'}, access, 1, true)
+                    local access = namedId(scopePrefix .. 'AccessMethod', {'access', identity})
+                    local accessGroup = group(key({identity, 'access'}), 'Access Method', ownerSelector, ownerValue,
+                        ownerSelector, ownerValue, 3, 0, scopePrefix .. 'AccessMethodSection')
+                    picker(access, 'Access Method', accessGroup, {0, 1},
+                        {'1 key per slot', 'Activate group first'}, nil, nil, true, 2, nil, 1)
+                    local default = namedId(scopePrefix .. 'FirstGroupDefault', {'first_default', identity})
+                    picker(default, 'First group is default (needs no key)', accessGroup,
+                        {0, 1}, {'Off', 'On'}, access, 1, true, nil, nil, 0)
                     definition.access, definition.firstDefault = access, default
                     definition.direct, definition.groups, definition.shared = {}, {}, {}
                     local maxSlots, slotIndex, groupNames = 0, 0, {}
@@ -174,24 +220,32 @@ function M.generate(registry, options)
                         groupNames[g.name] = true
                         maxSlots = math.max(maxSlots, g.slots)
                         assert(g.slots <= 126, 'group slot count exceeds menu capacity')
-                        local directGroup = group(key({identity, 'direct', g.name}), g.name, selector, value, access, 0, 5)
+                        local directGroup = group(key({identity, 'direct', g.name}), g.name, ownerSelector, ownerValue,
+                            access, 0, 5, nil, scopePrefix .. publicName(g.name))
                         definition.direct[item.key] = {}
                         for slot = 1, g.slots do
                             slotIndex = slotIndex + 1
+                            local nativeSlot = ((slotIndex - 1) % 4) + 1
+                            local defaultMode = slotIndex > 4 and slotModes[2] or slotModes[1]
                             definition.direct[item.key][slot] = binding(key({identity, 'direct', g.name, slot}),
-                                'Slot ' .. slotIndex .. ' (' .. g.type .. ')', directGroup, nil, nil, slotModes)
+                                'Slot ' .. slotIndex .. ' (' .. g.type .. ')', directGroup, nil, nil, slotModes,
+                                scopePrefix .. 'Slot' .. slotIndex, quickslotDefaults.slots[nativeSlot], defaultMode)
                         end
                     end
-                    local activateGroup = group(key({identity, 'groups'}), 'Groups', selector, value, access, 1)
+                    local activateGroup = group(key({identity, 'groups'}), 'Groups', ownerSelector, ownerValue,
+                        access, 1, nil, nil, scopePrefix .. 'Groups')
                     for index, item in ipairs(ordered) do
                         local g = item.value
                         definition.groups[item.key] = binding(key({identity, 'activate', g.name}), g.name,
-                            activateGroup, index == 1 and default or nil, index == 1 and 0 or nil, {0, 2})
+                            activateGroup, index == 1 and default or nil, index == 1 and 0 or nil, {0, 2},
+                            scopePrefix .. 'Group' .. index, index == 2 and quickslotDefaults.swap or 0, 0)
                     end
-                    local sharedGroup = group(key({identity, 'slots'}), 'Slots', selector, value, access, 1)
+                    local sharedGroup = group(key({identity, 'slots'}), 'Slots', ownerSelector, ownerValue,
+                        access, 1, nil, nil, scopePrefix .. 'Slots')
                     for slot = 1, maxSlots do
                         definition.shared[slot] = binding(key({identity, 'shared', slot}), 'Slot ' .. slot,
-                            sharedGroup, nil, nil, slotModes)
+                            sharedGroup, nil, nil, slotModes, scopePrefix .. 'SharedSlot' .. slot,
+                            quickslotDefaults.slots[((slot - 1) % 4) + 1], slotModes[1])
                     end
                 else
                     warnings[#warnings + 1] = category .. ': no category-specific renderer defined'
@@ -200,9 +254,11 @@ function M.generate(registry, options)
                     definition.settings = {}
                     for _, providerGroup in ipairs(Provider.normalize(template.settings)) do
                         local groupId = group(key({identity, 'provider', providerGroup.id}), providerGroup.label,
-                            selector, value, selector, value, providerGroup.level)
+                            ownerSelector, ownerValue, ownerSelector, ownerValue, providerGroup.level, nil,
+                            scopePrefix .. publicName(providerGroup.id))
                         for _, field in ipairs(providerGroup.fields) do
-                            local settingId = id({'provider', identity, field.id})
+                            local settingId = namedId(scopePrefix .. publicName(field.id),
+                                {'provider', identity, field.id})
                             local metadata = {Id=settingId, Label=field.label, Group=groupId, Type=field.type,
                                 Default=field.default, Description=field.description, ammLevel=field.level}
                             if field.type == 'picker' then
@@ -274,30 +330,43 @@ function M.generate(registry, options)
         end
         local result = {}
         local function readBinding(pair) return {key = effective[pair.key], mode = effective[pair.mode]} end
+        local function readSelection(definition)
+            local selection = {configuration = {}}
+            if not definition then return selection end
+            selection.id = definition.id
+            local config = selection.configuration
+            if definition.settings then
+                config.settings = {}
+                for field, settingId in pairs(definition.settings) do config.settings[field] = effective[settingId] end
+            end
+            if definition.access then
+                config.access = effective[definition.access]
+                config.firstGroupDefault = config.access == 1 and effective[definition.firstDefault] == 1
+                config.direct, config.groups, config.shared = {}, {}, {}
+                for groupKey, slots in pairs(definition.direct) do
+                    config.direct[groupKey] = {}
+                    for i, pair in ipairs(slots) do config.direct[groupKey][i] = readBinding(pair) end
+                end
+                for groupKey, pair in pairs(definition.groups) do config.groups[groupKey] = readBinding(pair) end
+                for i, pair in ipairs(definition.shared) do config.shared[i] = readBinding(pair) end
+            end
+            return selection
+        end
         for category, selector in pairs(selectors) do
           if not includedCategories or includedCategories[category] then
             local definition = decoded[category][effective[selector.id]]
-            local selection = {configuration = {}}
-            result[category] = selection
-            if definition then
-                selection.id = definition.id
-                local config = selection.configuration
-                if definition.settings then
-                    config.settings = {}
-                    for field, settingId in pairs(definition.settings) do config.settings[field] = effective[settingId] end
-                end
-                if definition.access then
-                    config.access = effective[definition.access]
-                    config.firstGroupDefault = config.access == 1 and effective[definition.firstDefault] == 1
-                    config.direct, config.groups, config.shared = {}, {}, {}
-                    for groupKey, slots in pairs(definition.direct) do
-                        config.direct[groupKey] = {}
-                        for i, pair in ipairs(slots) do config.direct[groupKey][i] = readBinding(pair) end
-                    end
-                    for groupKey, pair in pairs(definition.groups) do config.groups[groupKey] = readBinding(pair) end
-                    for i, pair in ipairs(definition.shared) do config.shared[i] = readBinding(pair) end
+            result[category] = readSelection(definition)
+          end
+        end
+        for category, templates in pairs(multiSelectors) do
+          if not includedCategories or includedCategories[category] then
+            local selections = {}
+            for _, item in ipairs(templates) do
+                if effective[item.id] == 1 then
+                    selections[#selections + 1] = readSelection(item.definition)
                 end
             end
+            result[category] = selections
           end
         end
         return result
@@ -306,11 +375,12 @@ function M.generate(registry, options)
     local aggregateId = 'UE4SSTemplatingEngine'
     local aggregateManifest = providerManifest(aggregateId, 'Templates', aggregateRows, true)
     local allCategories = {}; for category in pairs(selectors) do allCategories[category] = true end
+    for category in pairs(multiSelectors) do allCategories[category] = true end
     local aggregate = {id=aggregateId, name='Templates', manifest=aggregateManifest, rows=aggregateRows,
         decode=makeDecoder(aggregateRows, allCategories)}
     local pages, pageByCategory, providers = {}, {}, {[aggregateId]=aggregate}
     for _, category in ipairs(registry.categories:list()) do
-        if selectors[category] then
+        if selectors[category] or multiSelectors[category] then
             local providerId = aggregateId .. '.' .. category
             local included, selectedRows = {[category]=true}, pageRows[category]
             local page = {id=providerId, name=categoryLabels[category], category=category,
@@ -320,7 +390,7 @@ function M.generate(registry, options)
         end
     end
     return {manifest = aggregateManifest, fullManifest = table.concat(lines, '\n'), catalog = catalog,
-        rows = rows, selectors = selectors, definitions = decoded, warnings = warnings,
+        rows = rows, selectors = selectors, multiSelectors=multiSelectors, definitions = decoded, warnings = warnings,
         decode = makeDecoder(rows, allCategories), aggregate=aggregate, pages=pages,
         pageByCategory=pageByCategory, providers=providers}
 end
