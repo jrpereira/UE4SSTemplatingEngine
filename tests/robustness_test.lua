@@ -11,7 +11,7 @@ end
 local categories = C.new(); categories:registerCategory('player', {'quickslots'})
 categories:setCategory('player.quickslots', {single=true})
 local template = {collection = 'Robustness', name = 'Lifecycle', category = 'player.quickslots',
-    settings={enabled=true},
+    settings={target='templates',enabled=true},
     actions = {A = {name = 'Alpha', slots = 1, type = 'any'}, B = {name = 'Beta', slots = 2, type = 'any'}}}
 local registry = R.new(categories, {execute = function() return template end})
 registry:registerTemplate('fixture.lua'); registry:loadTemplatesFromRegister()

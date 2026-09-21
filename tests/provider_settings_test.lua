@@ -7,7 +7,7 @@ local function rejects(fn, text)
     local ok, err=pcall(fn)
     assert(not ok and tostring(err):find(text,1,true),tostring(err)); checks=checks+1
 end
-local declaration={enabled=true,groups={
+local declaration={target='templates',enabled=true,groups={
     {id='Secondary',label='Secondary',level=4,order=3},
     {id='Primary',label='Primary Visuals',level=4,order=2},
     {id='Visuals',label='Visuals',level=4,order=1},

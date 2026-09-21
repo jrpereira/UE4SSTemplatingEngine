@@ -80,7 +80,7 @@ function M.generate(registry, options)
     local lines, rows, groups, bindings, selectors, multiSelectors, warnings = {}, {}, {}, {}, {}, {}, {}
     local groupSections, groupOrder = {}, {}
     local aggregateGroups, aggregateGroupOrder = {}, {}
-    local aggregateRows, pageRows, categoryLabels, currentCategory = {}, {}, {}, nil
+    local aggregateRows, pageRows, categoryLabels, currentCategory, currentOwner = {}, {}, {}, nil, nil
     local function emit(section, fields)
         lines[#lines + 1] = '[' .. section .. ']'
         local names = {}; for name, value in pairs(fields) do
@@ -97,6 +97,7 @@ function M.generate(registry, options)
         fields.ConfigFile, fields.ConfigSection, fields.ConfigKey = 'config.ini', 'Templates', fields.Id
         rows[#rows + 1] = fields
         fields._category = currentCategory
+        fields._owner = currentOwner
         pageRows[currentCategory] = pageRows[currentCategory] or {}
         pageRows[currentCategory][#pageRows[currentCategory] + 1] = fields
         emit('Setting.' .. fields.Id, fields)
@@ -129,7 +130,7 @@ function M.generate(registry, options)
         row({Id = settingId, Type = 'integer', Label = text(label), Group = groupId,
             Minimum = 0, Maximum = 254, Step = 1, Default = defaultKey or 0, ammType = 'keybind',
             VisibleWhen = source, VisibleValues = visible})
-        row({Id = modeId, Type = 'picker', Label = text(label .. ' mode'), Group = groupId,
+        row({Id = modeId, Type = 'picker', Label = text(label), Group = groupId,
             PresetValues = table.concat(modeValues, '|'), PresetLabels = 'Tap|Hold',
             Default = defaultMode == nil and modeValues[1] or defaultMode,
             ammType = 'tab', Pair = settingId, VisibleWhen = source, VisibleValues = visible})
@@ -176,6 +177,7 @@ function M.generate(registry, options)
                     or publicName(category) .. 'Template'
                 selector = namedId(selectorName, {'selector', category})
                 picker(selector, title(suffix), aggregateGroup, values, labels, nil, nil, true, 2, 440)
+                rows[#rows]._control = true
                 aggregateRows[#aggregateRows + 1] = rows[#rows]
                 selectors[category] = {id = selector, byValue = byValue}
             else
@@ -184,6 +186,7 @@ function M.generate(registry, options)
             decoded[category] = {}
             for _, entry in ipairs(available) do
                 local template, identity = entry.template, storageIdentity(entry)
+                currentOwner = identity
                 local value = allocate({'template', identity})
                 local templateScope
                 if not categorySingle then templateScope = publicName(template.name) end
@@ -197,6 +200,7 @@ function M.generate(registry, options)
                     ownerValue = 1
                     picker(ownerSelector, template.name, aggregateGroup, {0, 1}, {'No', 'Yes'},
                         nil, nil, true, 2, 440, 0)
+                    rows[#rows]._control = true
                     aggregateRows[#aggregateRows + 1] = rows[#rows]
                     multiSelectors[category][#multiSelectors[category] + 1] = {
                         id=ownerSelector, value=value, definition=definition}
@@ -275,6 +279,7 @@ function M.generate(registry, options)
                     end
                 end
             end
+            currentOwner = nil
         end
     end
     currentCategory = nil
@@ -292,15 +297,27 @@ function M.generate(registry, options)
         local output = {}
         append(output, 'Mod', {Id=providerId, Name=providerName, Version='0.0.17',
             Description=options.description and text(options.description) or nil})
-        local usedGroups = {}
-        for _, item in ipairs(selectedRows) do usedGroups[item.Group] = true end
+        local usedGroups, visibleGroups, hiddenByGroup = {}, {}, {}
+        for _, item in ipairs(selectedRows) do
+            usedGroups[item.Group] = true
+            if item._routeHidden then hiddenByGroup[item.Group] = hiddenByGroup[item.Group] or item
+            else visibleGroups[item.Group] = true end
+        end
         for _, groupId in ipairs(aggregateGroupOrder) do
             if usedGroups[groupId] then
                 append(output, 'Category.' .. groupId, aggregatePage and {} or {ammHeading=0})
             end
         end
         for _, groupId in ipairs(groupOrder) do
-            if usedGroups[groupId] then append(output, 'Category.' .. groupId, groupSections[groupId]) end
+            if usedGroups[groupId] then
+                local fields = groupSections[groupId]
+                if not visibleGroups[groupId] then
+                    fields = U.copy(fields)
+                    fields.VisibleWhen = hiddenByGroup[groupId]._hideWhen
+                    fields.VisibleValues = hiddenByGroup[groupId]._hideValue
+                end
+                append(output, 'Category.' .. groupId, fields)
+            end
         end
         for _, item in ipairs(selectedRows) do append(output, 'Setting.' .. item.Id, item) end
         local manifest = table.concat(output, '\n')
@@ -309,7 +326,7 @@ function M.generate(registry, options)
     end
     local schema = {}
     for _, r in ipairs(rows) do schema[r.Id] = r end
-    local function makeDecoder(requiredRows, includedCategories)
+    local function makeDecoder(requiredRows, includedCategories, owned)
       return function(values)
         assert(type(values) == 'table', 'Apply values must be a table')
         local effective = {}
@@ -355,15 +372,21 @@ function M.generate(registry, options)
         for category, selector in pairs(selectors) do
           if not includedCategories or includedCategories[category] then
             local definition = decoded[category][effective[selector.id]]
-            result[category] = readSelection(definition)
+            if not owned or not definition or owned[definition.id] then
+                result[category] = readSelection(definition)
+            end
           end
         end
         for category, templates in pairs(multiSelectors) do
           if not includedCategories or includedCategories[category] then
             local selections = {}
+            if owned then selections._partial, selections._known = true, {} end
             for _, item in ipairs(templates) do
+                if not owned or owned[item.definition.id] then
+                    if owned then selections._known[item.definition.id] = true end
                 if effective[item.id] == 1 then
                     selections[#selections + 1] = readSelection(item.definition)
+                end
                 end
             end
             result[category] = selections
@@ -378,21 +401,70 @@ function M.generate(registry, options)
     for category in pairs(multiSelectors) do allCategories[category] = true end
     local aggregate = {id=aggregateId, name='Templates', manifest=aggregateManifest, rows=aggregateRows,
         decode=makeDecoder(aggregateRows, allCategories)}
-    local pages, pageByCategory, providers = {}, {}, {[aggregateId]=aggregate}
+    local pages, pageByCategory, pageByModule, providers = {}, {}, {}, {[aggregateId]=aggregate}
+    local ownerControls = {}
+    for category, selector in pairs(selectors) do
+        for _, definition in pairs(decoded[category]) do
+            ownerControls[definition.id] = {id=selector.id, impossible=-1}
+        end
+    end
+    for _, templates in pairs(multiSelectors) do
+        for _, item in ipairs(templates) do ownerControls[item.definition.id] = {id=item.id, impossible=2} end
+    end
+    local function routedRows(categories, owned)
+        local selected = {}
+        for _, item in ipairs(rows) do
+            if categories[item._category] then
+                if item._control or (item._owner and owned[item._owner]) then
+                    selected[#selected + 1] = item
+                elseif item._owner then
+                    local hidden, control = U.copy(item), assert(ownerControls[item._owner])
+                    hidden._routeHidden, hidden._hideWhen, hidden._hideValue = true, control.id, control.impossible
+                    selected[#selected + 1] = hidden
+                end
+            end
+        end
+        return selected
+    end
+    local categoryOwned = {}
+    local moduleOwned, moduleCategories = {}, {}
+    for _, entry in ipairs(entries) do
+        local template = entry.template
+        if template.settings.target == 'templates' then
+            categoryOwned[template.category] = categoryOwned[template.category] or {}
+            categoryOwned[template.category][entry.id] = true
+        else
+            local module = template.collection
+            moduleOwned[module], moduleCategories[module] = moduleOwned[module] or {}, moduleCategories[module] or {}
+            moduleOwned[module][entry.id], moduleCategories[module][template.category] = true, true
+        end
+    end
     for _, category in ipairs(registry.categories:list()) do
-        if selectors[category] or multiSelectors[category] then
+        if categoryOwned[category] then
             local providerId = aggregateId .. '.' .. category
-            local included, selectedRows = {[category]=true}, pageRows[category]
+            local included = {[category]=true}
+            local selectedRows = routedRows(included, categoryOwned[category])
             local page = {id=providerId, name=categoryLabels[category], category=category,
                 rows=selectedRows, manifest=providerManifest(providerId, categoryLabels[category], selectedRows, false)}
             page.decode = makeDecoder(page.rows, included)
             pages[#pages + 1], pageByCategory[category], providers[providerId] = page, page, page
         end
     end
+    local moduleNames = {}; for module in pairs(moduleOwned) do moduleNames[#moduleNames + 1] = module end
+    table.sort(moduleNames)
+    for _, module in ipairs(moduleNames) do
+        local providerId = aggregateId .. '.module.' .. publicName(module)
+        local moduleLabel = module:match('^%s*(.-)%s*$')
+        local selectedRows = routedRows(moduleCategories[module], moduleOwned[module])
+        local page = {id=providerId, name=moduleLabel, module=module, rows=selectedRows,
+            manifest=providerManifest(providerId, moduleLabel, selectedRows, false)}
+        page.decode = makeDecoder(page.rows, moduleCategories[module])
+        pages[#pages + 1], pageByModule[module], providers[providerId] = page, page, page
+    end
     return {manifest = aggregateManifest, fullManifest = table.concat(lines, '\n'), catalog = catalog,
         rows = rows, selectors = selectors, multiSelectors=multiSelectors, definitions = decoded, warnings = warnings,
         decode = makeDecoder(rows, allCategories), aggregate=aggregate, pages=pages,
-        pageByCategory=pageByCategory, providers=providers}
+        pageByCategory=pageByCategory, pageByModule=pageByModule, providers=providers}
 end
 
 return M

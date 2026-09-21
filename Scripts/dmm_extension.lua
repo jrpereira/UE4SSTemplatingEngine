@@ -23,7 +23,9 @@ return {
                 if provider.name == 'Templates' then
                     local ownsPages = true
                     for _, page in ipairs(definitions.pages) do
-                        ownsPages = ownsPages and page.id == provider.id .. '.' .. page.category
+                        ownsPages = ownsPages and type(page.id) == 'string'
+                            and page.id:sub(1, #provider.id + 1) == provider.id .. '.'
+                            and ((type(page.category) == 'string') ~= (type(page.module) == 'string'))
                     end
                     if ownsPages then
                         assert(aggregate == nil, 'duplicate TE aggregate provider')

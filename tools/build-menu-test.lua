@@ -26,8 +26,10 @@ end
 write('mod_settings.ini',menu.aggregate.manifest)
 local pageLines={'return {version=1,pages={'}
 for _,page in ipairs(menu.pages) do
-    pageLines[#pageLines+1]=string.format('{id=%q,name=%q,category=%q,version=%q,manifest=%q},',
-        page.id,page.name,page.category,'0.0.17',page.manifest)
+    local category=page.category and string.format('%q',page.category) or 'nil'
+    local module=page.module and string.format('%q',page.module) or 'nil'
+    pageLines[#pageLines+1]=string.format('{id=%q,name=%q,category=%s,module=%s,version=%q,manifest=%q},',
+        page.id,page.name,category,module,'0.0.17',page.manifest)
 end
 pageLines[#pageLines+1]='}}\n';write('menu-pages.lua',table.concat(pageLines,'\n'))
 local lines={'return {version=1,next='..menu.catalog.next..',entries={'}
@@ -36,4 +38,4 @@ for _,key in ipairs(keys) do lines[#lines+1]=string.format('[%q]=%d,',key,menu.c
 lines[#lines+1]='}}\n';write('identity-catalog.lua',table.concat(lines,'\n'))
 write('menu-profile.lua','return {mode="menu-test",templates={"templates/default.lua","../QuickslotsForever/templates/quickslots.lua","../AdaptiveModMenu/templates/fixes.lua"},description='..string.format('%q',description)..'}\n')
 write('enabled.txt','')
-print('Built '..#menu.rows..' settings across Templates and '..#menu.pages..' category pages')
+print('Built '..#menu.rows..' settings across Templates and '..#menu.pages..' routed pages')

@@ -104,8 +104,8 @@ function M.start(root, settings, queue, log)
         'category page definitions changed; rebuild TE menu before restart')
     for index, page in ipairs(menu.pages) do
         local saved = pageDefinitions.pages[index]
-        assert(saved.id == page.id and saved.category == page.category and saved.manifest == page.manifest,
-            'category page changed; rebuild TE menu before restart')
+        assert(saved.id == page.id and saved.category == page.category and saved.module == page.module
+            and saved.manifest == page.manifest, 'routed page changed; rebuild TE menu before restart')
     end
     if ensureConfig(root .. '/config.ini', menu.rows) then log('Added defaults for new template settings.') end
     service = {}

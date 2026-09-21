@@ -8,7 +8,7 @@ local categories = Categories.new(); categories:registerCategory('player', {'qui
 local calls, failAttach, failDetach, deferAttach = {}, false, false, false
 local function template(name)
     return {collection = 'Tests', category = 'player.quickslots', name = name,
-        settings = {enabled=true},
+        settings = {target='templates',enabled=true},
         events = name == 'A' and {'GroupSelected'} or {'SlotActivated'},
         actions = {{name = 'Group', slots = 1, type = 'any'}},
         attach = function(self, context, target, spec, previous)
@@ -32,7 +32,7 @@ local function template(name)
             return target.ready and 'applied' or 'not_ready'
         end}
 end
-local disabled={collection='Tests',category='player.quickslots',name='Disabled',settings={enabled=false},
+local disabled={collection='Tests',category='player.quickslots',name='Disabled',settings={target='templates',enabled=false},
     events={'GroupSelected'},actions={{name='Group',slots=1,type='any'}}}
 local registry = Registry.new(categories, {execute = function() return {template('A'), template('B'), disabled} end})
 registry:registerTemplate('test.lua'); registry:loadTemplatesFromRegister()
@@ -113,8 +113,8 @@ local eventResult,eventWhy=runtime:dispatch('player.quickslots','Unknown',contex
 check(eventResult==nil and eventWhy:find('unsupported player.quickslots event Unknown',1,true))
 local multiCategories=Categories.new();multiCategories:registerCategory('menu',{'fixes'})
 local multiTemplates={
-    {collection='Tests',category='menu.fixes',name='First',settings={enabled=true}},
-    {collection='Tests',category='menu.fixes',name='Second',settings={enabled=true}},
+    {collection='Tests',category='menu.fixes',name='First',settings={target='templates',enabled=true}},
+    {collection='Tests',category='menu.fixes',name='Second',settings={target='templates',enabled=true}},
 }
 local multiRegistry=Registry.new(multiCategories,{execute=function()return multiTemplates end})
 multiRegistry:registerTemplate('multi.lua');multiRegistry:loadTemplatesFromRegister()
@@ -129,6 +129,11 @@ check(multiRuntime:commit({revision=2,values={}},function()
 end,{}))
 selected=multiRuntime:selection('menu.fixes')
 check(#selected==1 and selected[1].id==secondId)
-check(multiRuntime:commit({revision=3,values={}},function()return {['menu.fixes']={}}end,{}))
+check(multiRuntime:commit({revision=3,values={}},function()
+    return {['menu.fixes']={_partial=true,_known={[firstId]=true}}}
+end,{}))
+selected=multiRuntime:selection('menu.fixes')
+check(#selected==1 and selected[1].id==secondId)
+check(multiRuntime:commit({revision=4,values={}},function()return {['menu.fixes']={}}end,{}))
 check(multiRuntime:selection('menu.fixes')==nil)
 print('lifecycle: ' .. checks .. ' checks passed')

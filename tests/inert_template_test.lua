@@ -4,7 +4,7 @@ local checks=0
 local function check(value) assert(value);checks=checks+1 end
 local categories=C.new();categories:registerCategory('menu',{'fixes'})
 local template={collection='Adaptive Mod Menu',name='Dawnwalker Settings Page Fixes',category='menu.fixes',
-    settings={enabled=false},
+    settings={target='templates',enabled=false},
     createCallbacks=function() error('inert template callback must not run') end}
 local registry=R.new(categories,{execute=function() return template end})
 registry:registerTemplate('fixes.lua');registry:loadTemplatesFromRegister()

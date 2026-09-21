@@ -263,7 +263,18 @@ function M.new(registry, options)
                 local ok, err = self:apply(category, selection.id, selection.configuration or {}, context)
                 if not ok then errors[category] = err end
             else
-                U.array(selection, category .. ' multi-template selections')
+                local partial, known = selection._partial == true, selection._known
+                if partial then assert(type(known) == 'table', 'partial multi-template selection requires known identities') end
+                local count = 0
+                for key in pairs(selection) do
+                    if type(key) == 'number' then
+                        assert(key >= 1 and key % 1 == 0, 'invalid multi-template selection index')
+                        count = count + 1
+                    else
+                        assert(key == '_partial' or key == '_known', 'invalid multi-template selection metadata')
+                    end
+                end
+                for index = 1, count do assert(rawget(selection,index) ~= nil, 'sparse multi-template selections') end
                 local desired, states = {}, self.multi[category] or {}
                 self.multi[category] = states
                 for _, item in ipairs(selection) do
@@ -272,7 +283,7 @@ function M.new(registry, options)
                     desired[item.id] = item
                 end
                 for identity, stateKey in pairs(states) do
-                    if not desired[identity] then
+                    if (not partial or known[identity]) and not desired[identity] then
                         local ok, err = guarded(function() return detach(category, context, 'none', stateKey) end)
                         if not ok then errors[category .. ':' .. identity] = err else states[identity] = nil end
                     end

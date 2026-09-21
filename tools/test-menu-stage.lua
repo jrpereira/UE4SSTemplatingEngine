@@ -71,4 +71,4 @@ for _,provider in ipairs(injected) do
         check(provider.path==root..'/mod_settings.ini' and #provider.choices==provider.settingsCount)
     end
 end
-print('menu stage: '..checks..' checks passed; '..#menu.aggregate.rows..' aggregate settings and '..#menu.pages..' category pages verified')
+print('menu stage: '..checks..' checks passed; '..#menu.aggregate.rows..' aggregate settings and '..#menu.pages..' routed pages verified')

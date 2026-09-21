@@ -11,7 +11,7 @@ local template = {
     collection = "My Dawnwalker Mods",
     name = "My Quickslots",
     category = "player.quickslots",
-    settings = { enabled = false },
+    settings = { target = "module", enabled = false },
     contexts = { "combat", "openworld" },
     events = { "GroupSelected", "SlotActivated" },
 
@@ -49,7 +49,9 @@ te:registerTemplates("templates")
 
 Once templates are loaded, TE validates them, adds them to the mod menu, and remembers the active template for each category. It invokes lifecycle methods only while the selected template has `settings.enabled = true`.
 
-The `Templates` DMM page and each generated category page use the category's selection policy. A category with `single = true` has one template picker. Other categories show one Yes/No picker per template and may activate several templates at once. Detailed controls remain scoped to their owning template.
+The `Templates` DMM page always aggregates every loaded template. A category with `single = true` has one template picker. Other categories show one Yes/No picker per template and may activate several templates at once.
+
+Every template also declares where its detailed controls appear with `settings.target`. Use `"templates"` to put them on TE's generated category page. Use `"module"` to put them on the page named by `collection`. A module page still shows the complete selector or Yes/No list for each category represented by that module, while detailed option blocks are limited to templates from that module.
 
 Generated key bindings follow AMM's mode-owned pairing contract. The mode picker survives as the composite row, uses `ammType=tab`, and declares `Pair=<key-setting-id>`. The integer key setting uses `ammType=keybind` without `Pair`; its normal DMM visibility determines whether the key component appears.
 
@@ -74,7 +76,7 @@ A template file may return one template or a nested array of templates. Template
 
 The `player.quickslots` service exposes `valid`, `same`, `identity`, and `parent`. A quickslots template calls these methods directly. TE resolves the current QuickslotsSwitcher and invokes `attach(service, target, configuration, previousHandle)` only when that target is valid. If it is unavailable, TE keeps the selection pending without calling template code. A declared category event retries the attachment with its resolved target, then invokes `render(service, handle, target, eventName)`. Handles retain provider-owned mutation and restoration state; templates do not rediscover or retain the category parent merely for later rendering.
 
-Every template declares a boolean `settings.enabled`, merging `groups` and `fields` into that table when it exposes menu controls. Bundled templates default it to `false`, and a fresh configuration keeps the category selector at `None`; existing saved selections remain unchanged. A disabled template may remain selected, but TE records it without calling `attach`, `render`, or `detach`. TE validates committed `configuration.settings` values against any declared fields before invoking enabled lifecycle code. Templates can import `require("te.widget")` for generic UE widget operations: `unwrap`, `property`, `number`, `translation`, `scale`, `opacity`, `setTranslation`, `setScale`, `setOpacity`, `snapshotSlot`, and `restoreSlot`. Layout policy, widget ownership, restoration journals, and category behavior stay in the template.
+Every template declares `settings.target` (`"templates"` or `"module"`) and a boolean `settings.enabled`, merging `groups` and `fields` into that table when it exposes menu controls. Bundled templates default `enabled` to `false`, and a fresh configuration keeps the category selector at `None`; existing saved selections remain unchanged. A disabled template may remain selected, but TE records it without calling `attach`, `render`, or `detach`. TE validates committed `configuration.settings` values against any declared fields before invoking enabled lifecycle code. Templates can import `require("te.widget")` for generic UE widget operations: `unwrap`, `property`, `number`, `translation`, `scale`, `opacity`, `setTranslation`, `setScale`, `setOpacity`, `snapshotSlot`, and `restoreSlot`. Layout policy, widget ownership, restoration journals, and category behavior stay in the template.
 
 ## Built-in categories
 

@@ -14,7 +14,7 @@ local ammPath = assert(os.getenv('TE_AMM_PRESENTATION'), 'TE_AMM_PRESENTATION re
 local Choices, Presentation = dofile(dmmPath), dofile(ammPath)
 local function fixture(last, name)
     return {collection = 'Tests', name = name or 'Quickslots++', category = 'player.quickslots',
-        settings={enabled=false}, actions = {
+        settings={target='templates',enabled=false}, actions = {
         {name = 'Consumables', slots = 4, type = 'consumables'},
         {name = 'Abilities', slots = 4, type = 'abilities'},
         {name = 'Extra', slots = last, type = 'any'},
@@ -74,6 +74,7 @@ for _, last in ipairs({2, 5}) do
         for _, pair in ipairs(slots) do
             check(rowsById[pair.key].Pair == nil and rowsById[pair.key].ammType == 'keybind')
             check(rowsById[pair.mode].Pair == pair.key and rowsById[pair.mode].ammType == 'tab')
+            check(rowsById[pair.mode].Label == rowsById[pair.key].Label)
         end
     end
     check(model.items[indices[selector.id]].default==0 and definition.enabled==false)
@@ -151,7 +152,7 @@ local restored = Menu.generate(baseRegistry, {catalog = removed.catalog})
 check(valueFor(initial, originalId) == valueFor(restored, originalId))
 local many = {}
 for i = 1, 8 do many[i] = {collection = 'Tests', category = 'player.stats', name = 'Stats ' .. i,
-    settings={enabled=false}} end
+    settings={target='templates',enabled=false}} end
 local ordinary = Menu.generate(registryFor(many))
 local model, indices = modelFor(ordinary, 'player.stats')
 check(not model.items[indices[ordinary.selectors['player.stats'].id]].ammTabs
@@ -159,9 +160,9 @@ check(not model.items[indices[ordinary.selectors['player.stats'].id]].ammTabs
 local multiCategories = Categories.new()
 multiCategories:registerCategory('other', {'unknown'})
 local multiRegistry = Registry.new(multiCategories, {execute=function() return {
-    {collection='Tests',name='First Attack',category='other.unknown',settings={enabled=false}},
-    {collection='Tests',name='Second Attack',category='other.unknown',settings={enabled=false}},
-    {collection='Tests',name='Third Attack',category='other.unknown',settings={enabled=false}},
+    {collection='Tests',name='First Attack',category='other.unknown',settings={target='templates',enabled=false}},
+    {collection='Tests',name='Second Attack',category='other.unknown',settings={target='templates',enabled=false}},
+    {collection='Tests',name='Third Attack',category='other.unknown',settings={target='templates',enabled=false}},
 } end})
 multiRegistry:registerTemplate('multi.lua'); multiRegistry:loadTemplatesFromRegister()
 local multi = Menu.generate(multiRegistry)
@@ -189,8 +190,8 @@ end
 groupedCategories:registerCategory('menu', {'controls', 'fixes', 'templates'})
 local groupedTemplates = {
     fixture(2),
-    {collection='Tests',name='Stats+',category='player.stats',settings={enabled=false}},
-    {collection='Tests',name='Menu Fix',category='menu.fixes',settings={enabled=false}},
+    {collection='Tests',name='Stats+',category='player.stats',settings={target='templates',enabled=false}},
+    {collection='Tests',name='Menu Fix',category='menu.fixes',settings={target='templates',enabled=false}},
 }
 local groupedRegistry = Registry.new(groupedCategories, {execute=function() return groupedTemplates end})
 groupedRegistry:registerTemplate('grouped.lua'); groupedRegistry:loadTemplatesFromRegister()
@@ -215,6 +216,59 @@ local groupedModel = modelFor(grouped)
 check(groupedModel.items[1].group == 'Menu' and groupedModel.items[1].ammGroup.heading
     and groupedModel.items[2].group == 'Player' and groupedModel.items[2].ammGroup.heading
     and groupedModel.items[3].group == 'Player' and groupedModel.items[3].ammGroup.heading)
+local routedCategories = Categories.new()
+routedCategories:registerCategory('player', {'quickslots'})
+routedCategories:setCategory('player.quickslots', {single=true})
+routedCategories:registerCategory('npc', {'attacks'})
+local routedTemplates = {}
+local function routedQuick(module, number)
+    local item=fixture(1, module .. ' Quickslots ' .. number)
+    item.collection, item.settings.target = module, 'module'
+    return item
+end
+local function routedAttack(module, number)
+    return {collection=module,name=module..' Attack '..number,category='npc.attacks',
+        settings={target='module',enabled=false},subscribe={{
+            path='/Game/_Dawnwalker/UI/_Unified/Combat/WBP_CombatTargetIndicator.WBP_CombatTargetIndicator_C',
+            events={'created'},contexts={'combat'}}}}
+end
+routedTemplates[#routedTemplates+1]=routedQuick('Module One',1)
+for i=1,2 do routedTemplates[#routedTemplates+1]=routedAttack('Module One',i) end
+for i=1,4 do routedTemplates[#routedTemplates+1]=routedQuick('Other Modules',i) end
+for i=1,4 do routedTemplates[#routedTemplates+1]=routedAttack('Other Modules',i) end
+local routedRegistry=Registry.new(routedCategories,{execute=function()return routedTemplates end})
+routedRegistry:registerTemplate('routed.lua');routedRegistry:loadTemplatesFromRegister()
+local routed=Menu.generate(routedRegistry)
+check(#routed.aggregate.rows==7 and #routed.pages==2 and next(routed.pageByCategory)==nil)
+check(#routed.multiSelectors['npc.attacks']==6)
+local routedSelector=routed.selectors['player.quickslots']
+local routedSelectorRow
+for _,item in ipairs(routed.aggregate.rows) do if item.Id==routedSelector.id then routedSelectorRow=item end end
+local choices=0 for _ in routedSelectorRow.PresetValues:gmatch('[^|]+') do choices=choices+1 end
+check(choices==6)
+local one=assert(routed.pageByModule['Module One'])
+local others=assert(routed.pageByModule['Other Modules'])
+check(one.name=='Module One' and one.module=='Module One' and others.name=='Other Modules')
+local oneOwned={};for _,entry in ipairs(routedRegistry.templates) do
+    if entry.template.collection=='Module One' then oneOwned[entry.id]=true end
+end
+local controls,details=0,0
+for _,item in ipairs(one.rows) do
+    if item._control then controls=controls+1
+    elseif not item._routeHidden then details=details+1;check(oneOwned[item._owner]) end
+end
+check(controls==7 and details>0)
+local oneValues={};for _,item in ipairs(one.rows) do oneValues[item.Id]=tonumber(item.Default) end
+local ownQuick
+for value,id in pairs(routedSelector.byValue) do if oneOwned[id] then ownQuick=value end end
+oneValues[routedSelector.id]=ownQuick
+local oneDecoded=one.decode(oneValues)
+check(oneDecoded['player.quickslots'].id==routedSelector.byValue[ownQuick])
+check(#oneDecoded['npc.attacks']==0)
+local externalQuick
+for value,id in pairs(routedSelector.byValue) do if not oneOwned[id] then externalQuick=value end end
+oneValues[routedSelector.id]=externalQuick
+check(one.decode(oneValues)['player.quickslots'].id==routedSelector.byValue[externalQuick])
 local bad = fixture(2); bad.name = 'Injected\n[Setting.Bad]'
 rejects(function() Menu.generate(registryFor(bad)) end, 'unsupported separators')
 bad = fixture(2); bad.actions = {Only = bad.actions[1]}
@@ -225,7 +279,7 @@ rejects(function() Menu.generate(registryFor(fixture(125))) end, '256 settings')
 rejects(function() Menu.generate(baseRegistry, {catalog = {version = 1, next = 3, entries = {a = 1, b = 1}}}) end, 'invalid catalog entry')
 local tooMany = {}
 for i = 1, 64 do tooMany[i] = {collection = 'Tests', category = 'player.stats', name = 'Stats ' .. i,
-    settings={enabled=false}} end
+    settings={target='templates',enabled=false}} end
 rejects(function() Menu.generate(registryFor(tooMany)) end, '63 templates')
 local tooLarge = fixture(2); tooLarge.actions = {}
 for i = 1, 25 do
