@@ -144,7 +144,7 @@ function M.generate(registry, options)
             for _, entry in ipairs(available) do
                 local template, identity = entry.template, storageIdentity(entry)
                 local value = allocate({'template', identity})
-                local definition = {id = entry.id, fields = {}}
+                local definition = {id=entry.id,fields={},enabled=template.settings.enabled}
                 decoded[category][value] = definition
                 if category == 'player.quickslots' then
                     local ordered = V.orderedGroups(template, (options.groupOrders or {})[entry.id])

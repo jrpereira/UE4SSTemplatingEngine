@@ -8,6 +8,7 @@ local categories = Categories.new(); categories:registerCategory('player', {'qui
 local calls, failAttach, failDetach, deferAttach = {}, false, false, false
 local function template(name)
     return {collection = 'Tests', category = 'player.quickslots', name = name,
+        settings = {enabled=false},
         events = name == 'A' and {'GroupSelected'} or {'SlotActivated'},
         actions = {{name = 'Group', slots = 1, type = 'any'}},
         attach = function(self, context, target, spec, previous)

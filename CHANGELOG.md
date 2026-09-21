@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Require `settings.enabled = false` on every template and keep fresh category selectors disabled without changing saved selections.
+
 - Validate category event interests and route declared events through service-first template callbacks.
 - Retry pending attachments when a declared category event arrives.
 - Validate committed provider settings before template attachment.

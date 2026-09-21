@@ -13,7 +13,8 @@ local dmmPath = assert(os.getenv('TE_DMM_CHOICES'), 'TE_DMM_CHOICES required for
 local ammPath = assert(os.getenv('TE_AMM_PRESENTATION'), 'TE_AMM_PRESENTATION required for actual decorator tests')
 local Choices, Presentation = dofile(dmmPath), dofile(ammPath)
 local function fixture(last, name)
-    return {collection = 'Tests', name = name or 'Quickslots++', category = 'player.quickslots', actions = {
+    return {collection = 'Tests', name = name or 'Quickslots++', category = 'player.quickslots',
+        settings={enabled=false}, actions = {
         {name = 'Consumables', slots = 4, type = 'consumables'},
         {name = 'Abilities', slots = 4, type = 'abilities'},
         {name = 'Extra', slots = last, type = 'any'},
@@ -47,6 +48,7 @@ for _, last in ipairs({2, 5}) do
     local selector = result.selectors['player.quickslots']
     local selected = next(selector.byValue)
     local definition = result.definitions['player.quickslots'][selected]
+    check(model.items[indices[selector.id]].default==0 and definition.enabled==false)
     check(model.items[indices[selector.id]].ammFont == 2)
     check(model.items[indices[definition.access]].ammFont == 2)
     check(model.items[indices[selector.id]].ammGroup.heading == false)
@@ -109,7 +111,8 @@ local removed = Menu.generate(registryFor(fixture(2, 'AAA')), {catalog = more.ca
 local restored = Menu.generate(baseRegistry, {catalog = removed.catalog})
 check(valueFor(initial, originalId) == valueFor(restored, originalId))
 local many = {}
-for i = 1, 8 do many[i] = {collection = 'Tests', category = 'player.stats', name = 'Stats ' .. i} end
+for i = 1, 8 do many[i] = {collection = 'Tests', category = 'player.stats', name = 'Stats ' .. i,
+    settings={enabled=false}} end
 local ordinary = Menu.generate(registryFor(many))
 local model, indices = modelFor(ordinary, 'player.stats')
 check(not model.items[indices[ordinary.selectors['player.stats'].id]].ammTabs)
@@ -124,7 +127,8 @@ check(#Menu.generate(mappedRegistry, {groupOrders = {[mappedRegistry.templates[1
 rejects(function() Menu.generate(registryFor(fixture(125))) end, '256 settings')
 rejects(function() Menu.generate(baseRegistry, {catalog = {version = 1, next = 3, entries = {a = 1, b = 1}}}) end, 'invalid catalog entry')
 local tooMany = {}
-for i = 1, 64 do tooMany[i] = {collection = 'Tests', category = 'player.stats', name = 'Stats ' .. i} end
+for i = 1, 64 do tooMany[i] = {collection = 'Tests', category = 'player.stats', name = 'Stats ' .. i,
+    settings={enabled=false}} end
 rejects(function() Menu.generate(registryFor(tooMany)) end, '63 templates')
 local tooLarge = fixture(2); tooLarge.actions = {}
 for i = 1, 25 do

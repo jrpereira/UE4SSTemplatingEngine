@@ -2,6 +2,7 @@ local template = {
     collection = "Templating Engine",
     name = "Default",
     category = "menu.templates",
+    settings = { enabled = false },
 
     menu = {
         aggregate = {

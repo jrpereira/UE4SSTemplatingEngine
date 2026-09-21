@@ -35,23 +35,28 @@ check(categories._categories.player.quickslots.visible == 1)
 check(categories:setCategory('other.unknown', {visible=1, count=2}).visible == 1)
 check(categories._categories.other.unknown.count == 2 and categories:contains('other.unknown'))
 rejects(function() categories:setCategory('missing', {visible=1}) end, 'unregistered category')
-check(V.template({collection='Tests',name='Unknown',category='other.unknown'}, categories, 'unknown.lua').category == 'other.unknown')
+check(V.template({collection='Tests',name='Unknown',category='other.unknown',settings={enabled=false}}, categories, 'unknown.lua').category == 'other.unknown')
+rejects(function() V.template({collection='Tests',name='Missing Settings',category='other.unknown'},
+    categories,'missing.lua') end,'settings must be a table')
+rejects(function() V.template({collection='Tests',name='Enabled',category='other.unknown',
+    settings={enabled=true}},categories,'enabled.lua') end,'settings.enabled must be false')
 rejects(function() categories:registerCategory('player', {'quickslots'}) end, 'duplicate category')
 rejects(function() categories:registerCategory('custom', {'a', 'a'}) end, 'duplicate category')
 check(not categories:contains('custom'))
-check(V.template({collection='Tests',name='Notice',category='player.notifications'}, categories, 'notice.lua').category == 'player.notifications')
-check(V.template({collection='Tests',name='Fixes',category='menu.fixes'},categories,'fixes.lua',true).category=='menu.fixes')
+check(V.template({collection='Tests',name='Notice',category='player.notifications',settings={enabled=false}}, categories, 'notice.lua').category == 'player.notifications')
+check(V.template({collection='Tests',name='Fixes',category='menu.fixes',settings={enabled=false}},categories,'fixes.lua',true).category=='menu.fixes')
 local indicator='/Game/_Dawnwalker/UI/_Unified/Combat/WBP_CombatTargetIndicator.WBP_CombatTargetIndicator_C'
-check(V.template({collection='Tests',name='Attacks',category='npc.attacks',subscribe={{path=indicator,
+check(V.template({collection='Tests',name='Attacks',category='npc.attacks',settings={enabled=false},subscribe={{path=indicator,
     events={'created'},contexts={'combat'}}}},categories,'attacks.lua').category=='npc.attacks')
 local Events=require('te.event_contracts')
 check(Events.active({contexts={'combat'}},{contexts={combat=true}}))
 check(not Events.active({contexts={'combat'}},{contexts={'openworld'}}))
-rejects(function() V.template({collection='Tests',name='Attacks',category='npc.attacks',subscribe={{path='Bad',
+rejects(function() V.template({collection='Tests',name='Attacks',category='npc.attacks',settings={enabled=false},subscribe={{path='Bad',
     events={'created'},contexts={'combat'}}}},categories,'attacks.lua') end,'unsupported npc.attacks path Bad')
 check(not categories:contains('player.actions') and not categories:contains('quickslots'))
 local function template(name)
     return {collection = 'Tests', name = name or 'First', category = 'player.quickslots',
+        settings={enabled=false},
         actions = {A = {name = 'Alpha', slots = 4, type = 'any'}}}
 end
 local sources = {['a.lua'] = template(), ['b.lua'] = {{template('Second')}, {}}}
@@ -72,7 +77,7 @@ check(quickslots.templates[1] == registry.templates[1].template
 check(U.identity(template()) ~= U.identity(template('Second')))
 rejects(function() V.flatten({category = 'player.quickslots'}, categories, 'bad.lua') end, 'bad.lua.collection')
 rejects(function() V.flatten({collection='Tests',category='player.quickslots',name='Bad',
-    actions={{name='Group',slots=1,type='any'}},events={'Unknown'}},categories,'bad.lua') end,
+    settings={enabled=false},actions={{name='Group',slots=1,type='any'}},events={'Unknown'}},categories,'bad.lua') end,
     'unsupported player.quickslots event Unknown')
 local invalid = template(); invalid.category = 'npc.actions'
 rejects(function() V.flatten(invalid, categories, 'bad.lua') end, 'unregistered category')

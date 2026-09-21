@@ -28,13 +28,15 @@ local function sort(a, b)
 end
 
 function M.normalize(declaration)
-    if declaration == nil then return {} end
     assert(type(declaration) == 'table', 'settings must be a table')
-    allowed(declaration, {groups=true,fields=true}, 'settings')
-    U.array(declaration.groups, 'settings.groups')
-    U.array(declaration.fields, 'settings.fields')
+    allowed(declaration, {enabled=true,groups=true,fields=true}, 'settings')
+    assert(declaration.enabled==false, 'settings.enabled must be false')
+    local declaredGroups=declaration.groups or {}
+    local declaredFields=declaration.fields or {}
+    U.array(declaredGroups, 'settings.groups')
+    U.array(declaredFields, 'settings.fields')
     local groups, byId, fields = {}, {}, {}
-    for index, source in ipairs(declaration.groups) do
+    for index, source in ipairs(declaredGroups) do
         assert(type(source) == 'table', 'provider group must be a table')
         allowed(source, {id=true,label=true,level=true,order=true}, 'provider group')
         identifier(source.id, 'provider group id'); text(source.label, 'provider group label'); level(source.level)
@@ -43,7 +45,7 @@ function M.normalize(declaration)
             order=order(source.order,index),index=index,fields={}}
         groups[#groups+1], byId[source.id] = g, g
     end
-    for index, source in ipairs(declaration.fields) do
+    for index, source in ipairs(declaredFields) do
         assert(type(source) == 'table', 'provider field must be a table')
         allowed(source, {id=true,label=true,group=true,type=true,order=true,default=true,values=true,
             labels=true,min=true,max=true,step=true,suffix=true,tab=true,level=true,description=true}, 'provider field')
@@ -90,11 +92,6 @@ function M.normalize(declaration)
 end
 
 function M.validate(declaration, committed)
-    if declaration == nil then
-        assert(committed == nil, 'template does not declare settings')
-        return nil
-    end
-    assert(type(committed) == 'table', 'committed settings are required')
     local expected = {}
     for _, group in ipairs(M.normalize(declaration)) do
         for _, field in ipairs(group.fields) do
@@ -111,6 +108,8 @@ function M.validate(declaration, committed)
             end
         end
     end
+    if next(expected)==nil and committed==nil then return nil end
+    assert(type(committed) == 'table', 'committed settings are required')
     for name in pairs(committed) do
         assert(expected[name], 'unknown provider setting ' .. tostring(name))
     end

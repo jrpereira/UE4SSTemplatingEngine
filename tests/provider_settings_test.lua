@@ -7,7 +7,7 @@ local function rejects(fn, text)
     local ok, err=pcall(fn)
     assert(not ok and tostring(err):find(text,1,true),tostring(err)); checks=checks+1
 end
-local declaration={groups={
+local declaration={enabled=false,groups={
     {id='Secondary',label='Secondary',level=4,order=3},
     {id='Primary',label='Primary Visuals',level=4,order=2},
     {id='Visuals',label='Visuals',level=4,order=1},
@@ -101,6 +101,7 @@ invalid(function(d) d.fields[3].min=-math.huge end,'integer min required')
 invalid(function(d) d.fields[3].type='custom' end,'unsupported provider field type')
 invalid(function(d) d.fields[1].visibleWhen='PrimaryWheel' end,'unsupported property')
 invalid(function(d) d.fields[1].level=1 end,'level 1 is reserved')
+invalid(function(d) d.enabled=true end,'settings.enabled must be false')
 local file=assert(io.open('outputs/example-provider-mod_settings.ini','wb'))
 file:write(menu.manifest);file:close()
 print('provider settings: '..checks..' checks passed')

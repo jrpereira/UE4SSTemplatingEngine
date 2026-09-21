@@ -11,6 +11,7 @@ local template = {
     collection = "My Dawnwalker Mods",
     name = "My Quickslots",
     category = "player.quickslots",
+    settings = { enabled = false },
     contexts = { "combat", "openworld" },
     events = { "GroupSelected", "SlotActivated" },
 
@@ -71,7 +72,7 @@ A template file may return one template or a nested array of templates. Template
 
 The `player.quickslots` service exposes `valid`, `same`, `identity`, and `parent`. A quickslots template calls these methods directly. TE resolves the current QuickslotsSwitcher and invokes `attach(service, target, configuration, previousHandle)` only when that target is valid. If it is unavailable, TE keeps the selection pending without calling template code. A declared category event retries the attachment with its resolved target, then invokes `render(service, handle, target, eventName)`. Handles retain provider-owned mutation and restoration state; templates do not rediscover or retain the category parent merely for later rendering.
 
-Templates may declare menu controls in `settings = { groups = {...}, fields = {...} }`. TE validates the committed `configuration.settings` values against that declaration before invoking `attach`. Persisted setting identities retain their existing values when adopting this name. Templates can import `require("te.widget")` for generic UE widget operations: `unwrap`, `property`, `number`, `translation`, `scale`, `opacity`, `setTranslation`, `setScale`, `setOpacity`, `snapshotSlot`, and `restoreSlot`. Layout policy, widget ownership, restoration journals, and category behavior stay in the template.
+Every template declares `settings = { enabled = false }`, merging `groups` and `fields` into that table when it exposes menu controls. A fresh configuration therefore keeps the category selector at `None`; existing saved selections remain unchanged. TE validates committed `configuration.settings` values against any declared fields before invoking `attach`. Templates can import `require("te.widget")` for generic UE widget operations: `unwrap`, `property`, `number`, `translation`, `scale`, `opacity`, `setTranslation`, `setScale`, `setOpacity`, `snapshotSlot`, and `restoreSlot`. Layout policy, widget ownership, restoration journals, and category behavior stay in the template.
 
 ## Built-in categories
 
