@@ -74,4 +74,22 @@ before=#calls
 check(overridden:detach('player.quickslots',nil,'world_invalidated'))
 check(#calls==before and overridden:selection('player.quickslots')==nil)
 check(overridden:detach('player.quickslots',nil,'world_invalidated'))
+
+local attacks=C.new();attacks:registerCategory('npc',{'attacks'})
+local class='/Game/_Dawnwalker/UI/_Unified/Combat/WBP_CombatTargetIndicator.WBP_CombatTargetIndicator_C'
+local attackTemplate={collection='Boundary',name='Attacks',category='npc.attacks',subscribe={{path=class,
+    events={'created'},contexts={'combat'}}},
+    attach=function(self,service,target) check(target.kind=='hud');return {} end,
+    detach=function() return true end,render=function() return 'applied' end}
+local attackRegistry=R.new(attacks,{execute=function() return attackTemplate end})
+attackRegistry:registerTemplate('attacks.lua');attackRegistry:loadTemplatesFromRegister()
+local attackService={}
+for _,method in ipairs({'valid','visible','transition','cancelTransitions','isA','createWidget',
+    'viewportSize','viewportScale','nativeBrush','destroyWidget'}) do attackService[method]=function() return true end end
+local attackContext={services={['npc.attacks']=attackService},targets={['npc.attacks']={kind='hud'}}}
+local attackRuntime=L.new(attackRegistry)
+check(attackRuntime:apply('npc.attacks',attackRegistry.templates[1].id,{},attackContext))
+attackService.destroyWidget=nil
+local attackStatus,attackWhy=attackRuntime:render('npc.attacks',attackContext,{},'created')
+check(attackStatus==nil and attackWhy:find('attacks service requires destroyWidget',1,true))
 print('service boundary: '..checks..' checks passed')

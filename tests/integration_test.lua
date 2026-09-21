@@ -42,8 +42,8 @@ check(callbacks['UE4SSTemplatingEngine.player.stats'] ~= nil)
 check(attaches == 0) -- Editing values locally has no runtime effect.
 local eventCallbacks,eventStops,eventOutcomes={},0,{}
 local stopEvents=te:subscribeEvents({subscribe=function(category,event,fn)
-    check(category=='player.quickslots' and event=='GroupSelected')
-    eventCallbacks[event]=fn
+    check(category=='player.quickslots' and event.name=='GroupSelected' and event.path==nil)
+    eventCallbacks[event.name]=fn
     return function() eventStops=eventStops+1 end
 end},function() return {playerActions=dofile('tests/support/service.lua')(),
     targets={['player.quickslots']={kind='switcher'}}} end,

@@ -30,12 +30,14 @@ function M.template(template, categories, where, runtime)
     U.text(template.name, where .. '.name')
     assert(template.providerSettings == nil, where .. '.providerSettings: renamed to settings')
     Provider.normalize(template.settings)
-    Events.validate(template.category, template.events, where)
+    assert(template.modules==nil,where..'.modules: declare native targets inside events')
+    Events.validate(template.category, template.events, template.subscribe, where)
     if template.category == 'player.quickslots' then
         M.actions(template.actions, where .. '.actions')
         if template.actionOrder ~= nil then M.orderedGroups(template) end
     end
     if template.contexts ~= nil then
+        assert(template.category~='npc.attacks',where..'.contexts: declare contexts inside target events')
         U.array(template.contexts, where .. '.contexts')
         for i, context in ipairs(template.contexts) do U.text(context, where .. '.contexts[' .. i .. ']') end
     end

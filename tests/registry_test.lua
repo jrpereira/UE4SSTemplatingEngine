@@ -12,13 +12,14 @@ local function rejects(fn, fragment)
 end
 local categories = Categories.new()
 dofile('categories.lua')(function(...) categories:registerCategory(...) end)
-check(table.concat(categories:list(), ',') == 'menu.controls,menu.templates,npc.intent,npc.level,npc.melee,npc.pawn,other.unknown,player.charges,player.compass,player.notifications,player.quickslots,player.self,player.stats,player.wheel')
+check(table.concat(categories:list(), ',') == 'menu.controls,menu.templates,npc.attacks,npc.intent,npc.level,npc.melee,npc.pawn,other.unknown,player.charges,player.compass,player.notifications,player.quickslots,player.self,player.stats,player.wheel')
 check(not categories:contains('player') and not categories:contains('npc') and not categories:contains('other'))
 check(categories._categories.player.quickslots.visible == 0)
 check(categories._categories.player.quickslots.count == 0)
 check(type(categories._categories.player.quickslots.templates) == 'table'
     and next(categories._categories.player.quickslots.templates) == nil)
 check(categories._categories.npc.intent.visible == 0)
+check(categories._categories.npc.attacks.visible == 0)
 check(categories._categories.other.unknown.visible == 0)
 check(categories._categories.menu.controls.visible == 0
     and categories._categories.menu.controls.count == 0
@@ -36,6 +37,14 @@ rejects(function() categories:registerCategory('player', {'quickslots'}) end, 'd
 rejects(function() categories:registerCategory('custom', {'a', 'a'}) end, 'duplicate category')
 check(not categories:contains('custom'))
 check(V.template({collection='Tests',name='Notice',category='player.notifications'}, categories, 'notice.lua').category == 'player.notifications')
+local indicator='/Game/_Dawnwalker/UI/_Unified/Combat/WBP_CombatTargetIndicator.WBP_CombatTargetIndicator_C'
+check(V.template({collection='Tests',name='Attacks',category='npc.attacks',subscribe={{path=indicator,
+    events={'created'},contexts={'combat'}}}},categories,'attacks.lua').category=='npc.attacks')
+local Events=require('te.event_contracts')
+check(Events.active({contexts={'combat'}},{contexts={combat=true}}))
+check(not Events.active({contexts={'combat'}},{contexts={'openworld'}}))
+rejects(function() V.template({collection='Tests',name='Attacks',category='npc.attacks',subscribe={{path='Bad',
+    events={'created'},contexts={'combat'}}}},categories,'attacks.lua') end,'unsupported npc.attacks path Bad')
 check(not categories:contains('player.actions') and not categories:contains('quickslots'))
 local function template(name)
     return {collection = 'Tests', name = name or 'First', category = 'player.quickslots',

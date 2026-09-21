@@ -21,6 +21,11 @@ function M.new(registry, options)
             for _, method in ipairs({'valid', 'same', 'identity', 'parent'}) do
                 assert(type(service[method]) == 'function', 'quickslots service requires ' .. method)
             end
+        elseif category == 'npc.attacks' then
+            for _,method in ipairs({'valid','visible','transition','cancelTransitions','isA','createWidget',
+                'viewportSize','viewportScale','nativeBrush','destroyWidget'}) do
+                assert(type(service[method])=='function','attacks service requires '..method)
+            end
         end
         return service
     end
@@ -120,7 +125,7 @@ function M.new(registry, options)
             local desired = self.pending[category] or self.active[category]
             if not desired or not Events.interested(desired.template, event) then return 'ignored' end
             if self.pending[category] then
-                local attached, why = apply(category, desired.id, desired.configuration, context, payload)
+                local attached, why = apply(category, desired.id, desired.configuration, context)
                 if not attached then return nil, why end
                 if why == 'not_ready' then return 'not_ready' end
             end

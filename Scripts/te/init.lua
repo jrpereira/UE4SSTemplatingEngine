@@ -2,6 +2,7 @@ local Categories = require('te.categories')
 local Registry = require('te.registry')
 local Lifecycle = require('te.lifecycle')
 local Menu = require('te.menu')
+local Events = require('te.event_contracts')
 local M = {}
 
 -- Host supplies discovery, native scheduling/readiness and configuration storage.
@@ -72,8 +73,9 @@ function M.new(options)
         local requested = {}
         for _, entry in ipairs(registry.templates) do
             local category = entry.template.category
-            for _, event in ipairs(entry.template.events or {}) do
-                requested[category .. '\0' .. event] = {category=category,event=event}
+            for _,event in ipairs(Events.declarations(category,entry.template.events,entry.template.subscribe,entry.location)) do
+                requested[category..'\0'..event.name..'\0'..(event.path or '')..'\0'..
+                    table.concat(event.contexts or {},'\0')]={category=category,event=event}
             end
         end
         local keys = {}; for identity in pairs(requested) do keys[#keys+1]=identity end; table.sort(keys)
@@ -81,11 +83,16 @@ function M.new(options)
         for _, identity in ipairs(keys) do
             local interest = requested[identity]
             local unsubscribe = eventHost.subscribe(interest.category, interest.event, function(payload)
+                local context=getContext()
+                if not Events.active(interest.event,context) then
+                    onResult('ignored','inactive_context',interest.category,interest.event.name)
+                    return
+                end
                 local ok, status, detail = pcall(function()
-                    return runtime:dispatch(interest.category, interest.event, getContext(), payload)
+                    return runtime:dispatch(interest.category,interest.event.name,context,payload)
                 end)
-                if not ok then onResult(nil, status, interest.category, interest.event)
-                else onResult(status, detail, interest.category, interest.event) end
+                if not ok then onResult(nil,status,interest.category,interest.event.name)
+                else onResult(status,detail,interest.category,interest.event.name) end
             end)
             assert(type(unsubscribe) == 'function', 'Event host must return unsubscribe')
             unsubscribers[#unsubscribers+1] = unsubscribe

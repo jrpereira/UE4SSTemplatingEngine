@@ -27,6 +27,6 @@ local lines={'return {version=1,next='..menu.catalog.next..',entries={'}
 local keys={};for key in pairs(menu.catalog.entries) do keys[#keys+1]=key end;table.sort(keys)
 for _,key in ipairs(keys) do lines[#lines+1]=string.format('[%q]=%d,',key,menu.catalog.entries[key]) end
 lines[#lines+1]='}}\n';write('identity-catalog.lua',table.concat(lines,'\n'))
-write('menu-profile.lua','return {mode="menu-test",templates={"templates/default.lua","../QuickslotsForever/templates/default.lua"},description='..string.format('%q',description)..'}\n')
+write('menu-profile.lua','return {mode="menu-test",templates={"templates/default.lua","../QuickslotsForever/templates/quickslots.lua"},description='..string.format('%q',description)..'}\n')
 write('enabled.txt','')
 print('Built '..#menu.rows..' settings across Templates and '..#menu.pages..' category pages from '..path)

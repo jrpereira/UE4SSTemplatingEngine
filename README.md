@@ -63,6 +63,8 @@ Categories may require extra data. `player.quickslots`, for example, requires an
 
 Templates declare the category events they consume with `events`. TE validates those names against the category contract, subscribes once through its event host, and delivers only declared events. The callback remains `render(service, handle, payload, eventName)`. If the selected template is waiting for native objects, a declared event retries `attach` before delivery. QSF currently declares `GroupSelected` and `SlotActivated`; it does not register those native hooks itself.
 
+Creation-driven categories declare independent native targets with `subscribe = { { path = "/Game/.../WBP_CombatTargetIndicator_C", events = { "created" }, contexts = { "combat" } } }`. TE validates the exact path, event, and context, owns `NotifyOnNewObject` and game-thread scheduling through `te.native_events`, passes the active GameHUD parent to `attach`, and passes each created indicator to `render` with event name `created`. The template service does not expose subscription, unsubscription, or scheduling methods.
+
 A template file may return one template or a nested array of templates. Template files are ordinary Lua and can access the environment in which the host loads them, so install templates only from sources you trust.
 
 `attach` is called on activation and again when settings are applied. It should be idempotent and preserve the original game state. `render` responds to relevant discovered widgets or events. `detach` runs while objects are still valid and must restore owned changes. When the world is already invalid, TE forgets the active handle without calling template code.
@@ -74,7 +76,7 @@ Templates may declare menu controls in `settings = { groups = {...}, fields = {.
 ## Built-in categories
 
 - `player.quickslots`, `player.stats`, `player.charges`, `player.self`, `player.compass`, `player.notifications`, `player.wheel`
-- `npc.intent`, `npc.level`, `npc.melee`, `npc.pawn`
+- `npc.attacks`, `npc.intent`, `npc.level`, `npc.melee`, `npc.pawn`
 - `other.unknown`
 - `menu.controls`, `menu.templates`
 
