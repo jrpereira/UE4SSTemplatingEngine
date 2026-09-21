@@ -78,10 +78,12 @@ Templates may declare menu controls in `settings = { groups = {...}, fields = {.
 - `player.quickslots`, `player.stats`, `player.charges`, `player.self`, `player.compass`, `player.notifications`, `player.wheel`
 - `npc.attacks`, `npc.intent`, `npc.level`, `npc.melee`, `npc.pawn`
 - `other.unknown`
-- `menu.controls`, `menu.templates`
+- `menu.controls`, `menu.fixes`, `menu.templates`
 
 Only categories with registered templates appear in the menu. A host may register additional categories before loading templates.
 
 Every registered category starts as `{ visible = 0, count = 0, templates = {} }`. Category metadata can then be updated in place. For example, `te:setCategory("player.quickslots", { visible = 1 })` sets `_categories.player.quickslots.visible` while preserving `count` and `templates`. When registered files are loaded successfully, TE increments the category's `count` and appends each loaded template object to its `templates` array.
+
+`menu.fixes` accepts inert Lua templates with no `attach`, `render`, `detach`, `events`, or `subscribe` fields. TE can register and select them as category metadata, but it never invokes their exported callbacks or registers native hooks on their behalf.
 
 > The current `0.0.17` menu-test build exercises registration, validation, menu generation, persistence, and Apply callbacks. Native discovery, gameplay input, and visual cutover are still under development.

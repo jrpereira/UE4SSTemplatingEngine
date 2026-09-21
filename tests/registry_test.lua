@@ -12,7 +12,7 @@ local function rejects(fn, fragment)
 end
 local categories = Categories.new()
 dofile('categories.lua')(function(...) categories:registerCategory(...) end)
-check(table.concat(categories:list(), ',') == 'menu.controls,menu.templates,npc.attacks,npc.intent,npc.level,npc.melee,npc.pawn,other.unknown,player.charges,player.compass,player.notifications,player.quickslots,player.self,player.stats,player.wheel')
+check(table.concat(categories:list(), ',') == 'menu.controls,menu.fixes,menu.templates,npc.attacks,npc.intent,npc.level,npc.melee,npc.pawn,other.unknown,player.charges,player.compass,player.notifications,player.quickslots,player.self,player.stats,player.wheel')
 check(not categories:contains('player') and not categories:contains('npc') and not categories:contains('other'))
 check(categories._categories.player.quickslots.visible == 0)
 check(categories._categories.player.quickslots.count == 0)
@@ -27,6 +27,9 @@ check(categories._categories.menu.controls.visible == 0
 check(categories._categories.menu.templates.visible == 0
     and categories._categories.menu.templates.count == 0
     and next(categories._categories.menu.templates.templates) == nil)
+check(categories._categories.menu.fixes.visible == 0
+    and categories._categories.menu.fixes.count == 0
+    and next(categories._categories.menu.fixes.templates) == nil)
 check(categories:setCategory('player.quickslots', {visible=1}).visible == 1)
 check(categories._categories.player.quickslots.visible == 1)
 check(categories:setCategory('other.unknown', {visible=1, count=2}).visible == 1)
@@ -37,6 +40,7 @@ rejects(function() categories:registerCategory('player', {'quickslots'}) end, 'd
 rejects(function() categories:registerCategory('custom', {'a', 'a'}) end, 'duplicate category')
 check(not categories:contains('custom'))
 check(V.template({collection='Tests',name='Notice',category='player.notifications'}, categories, 'notice.lua').category == 'player.notifications')
+check(V.template({collection='Tests',name='Fixes',category='menu.fixes'},categories,'fixes.lua',true).category=='menu.fixes')
 local indicator='/Game/_Dawnwalker/UI/_Unified/Combat/WBP_CombatTargetIndicator.WBP_CombatTargetIndicator_C'
 check(V.template({collection='Tests',name='Attacks',category='npc.attacks',subscribe={{path=indicator,
     events={'created'},contexts={'combat'}}}},categories,'attacks.lua').category=='npc.attacks')

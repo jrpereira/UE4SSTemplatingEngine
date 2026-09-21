@@ -9,6 +9,7 @@
 - Add `te.widget` helpers for safe UE property reads, transforms, opacity, and slot snapshots.
 - Resolve category targets in TE and pass them to `attach`, removing target discovery from template services.
 - Add `npc.attacks` and declarative native-class creation events owned and scheduled by TE.
+- Add the inert `menu.fixes` template category.
 - Split template selection into an aggregate `Templates` DMM page and generated category pages that own each template's detailed controls.
 - Add the DMM startup extension that injects generated category pages while keeping their settings rooted in TE's shared `config.ini`.
 - Add the `menu.controls` and `menu.templates` template categories.

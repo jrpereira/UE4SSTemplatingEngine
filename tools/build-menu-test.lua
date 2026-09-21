@@ -1,15 +1,22 @@
 package.path = 'Scripts/?.lua;' .. package.path
 local TE = require('te.init')
-local path, destination, existing = assert(arg[1]), assert(arg[2]), arg[3]
+local quickslotsPath, fixesPath, destination, existing = assert(arg[1]), assert(arg[2]), assert(arg[3]), arg[4]
 local description = 'Menu test: settings are saved, but new gameplay bindings and template visuals are not active.'
 local te=TE.new({listFiles=function() return {} end})
-te:registerTemplate('templates/default.lua');te:registerTemplate(path);te:loadTemplatesFromRegister()
-assert(#te.registry.templates == 2, 'expected TE and consumer templates')
+te:registerTemplate('templates/default.lua');te:registerTemplate(quickslotsPath)
+te:registerTemplate(fixesPath);te:loadTemplatesFromRegister()
+assert(#te.registry.templates == 3, 'expected TE, Quickslots and AMM templates')
 local consumer
 for _,entry in ipairs(te.registry.templates) do
     if entry.template.category=='player.quickslots' then consumer=entry.template end
 end
 assert(consumer and consumer.widgetRenderingEnabled == false, 'expected rendering-disabled consumer template')
+local fixes
+for _,entry in ipairs(te.registry.templates) do
+    if entry.template.category=='menu.fixes' then fixes=entry.template end
+end
+assert(fixes and fixes.events==nil and fixes.subscribe==nil and fixes.attach==nil,
+    'expected inert menu.fixes template')
 local catalog
 if existing then catalog=assert(loadfile(existing,'t',{}))() end
 local menu=te:generateMenu({catalog=catalog,description=description})
@@ -27,6 +34,6 @@ local lines={'return {version=1,next='..menu.catalog.next..',entries={'}
 local keys={};for key in pairs(menu.catalog.entries) do keys[#keys+1]=key end;table.sort(keys)
 for _,key in ipairs(keys) do lines[#lines+1]=string.format('[%q]=%d,',key,menu.catalog.entries[key]) end
 lines[#lines+1]='}}\n';write('identity-catalog.lua',table.concat(lines,'\n'))
-write('menu-profile.lua','return {mode="menu-test",templates={"templates/default.lua","../QuickslotsForever/templates/quickslots.lua"},description='..string.format('%q',description)..'}\n')
+write('menu-profile.lua','return {mode="menu-test",templates={"templates/default.lua","../QuickslotsForever/templates/quickslots.lua","../AdaptiveModMenu/template/fixes.lua"},description='..string.format('%q',description)..'}\n')
 write('enabled.txt','')
-print('Built '..#menu.rows..' settings across Templates and '..#menu.pages..' category pages from '..path)
+print('Built '..#menu.rows..' settings across Templates and '..#menu.pages..' category pages')

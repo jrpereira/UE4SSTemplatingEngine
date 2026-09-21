@@ -41,8 +41,10 @@ function M.template(template, categories, where, runtime)
         U.array(template.contexts, where .. '.contexts')
         for i, context in ipairs(template.contexts) do U.text(context, where .. '.contexts[' .. i .. ']') end
     end
+    local inert=template.category=='menu.fixes' and template.attach==nil
+        and template.detach==nil and template.render==nil
     for _, method in ipairs({'attach', 'detach', 'render'}) do
-        assert((not runtime and template[method] == nil) or type(template[method]) == 'function',
+        assert(inert or (not runtime and template[method] == nil) or type(template[method]) == 'function',
             where .. '.' .. method .. ': expected function' .. (runtime and '' or ' or nil'))
     end
     return template

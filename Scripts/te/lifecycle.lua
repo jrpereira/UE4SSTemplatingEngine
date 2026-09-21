@@ -53,6 +53,7 @@ function M.new(registry, options)
         end
         local current = self.active[category]
         if not current then return true end
+        if current.inert then self.active[category]=nil;return true end
         local service = resolveService(category, context)
         local ok, result, err = pcall(current.template.detach, current.template, service, current.handle, reason)
         if not ok then return nil, tostring(result) end
@@ -72,6 +73,12 @@ function M.new(registry, options)
             assert(type(configuration) == 'table', 'committed configuration must be a table')
             local spec = U.copy(configuration)
             Provider.validate(entry.template.settings, spec.settings)
+            if category=='menu.fixes' and entry.template.attach==nil
+                and entry.template.detach==nil and entry.template.render==nil then
+                self.pending[category]=nil
+                self.active[category]={id=identity,template=entry.template,configuration=spec,inert=true}
+                return true
+            end
             -- Validate before releasing an old attachment, then resolve freshly for each call.
             local service = resolveService(category, context)
             local target = resolveTarget(category, context, suppliedTarget)
@@ -113,6 +120,7 @@ function M.new(registry, options)
         return guarded(function()
             local current = self.active[category]
             if not current then return 'ignored' end
+            if current.inert then return 'ignored' end
             local status, err = current.template:render(resolveService(category, context), current.handle, target, reason)
             assert(status == 'applied' or status == 'not_ready' or status == 'ignored',
                 'invalid render status: ' .. tostring(status))
@@ -131,6 +139,7 @@ function M.new(registry, options)
             end
             local current = self.active[category]
             if not current then return 'ignored' end
+            if current.inert then return 'ignored' end
             local status, err = current.template:render(resolveService(category, context), current.handle, payload, event)
             assert(status == 'applied' or status == 'not_ready' or status == 'ignored',
                 'invalid render status: ' .. tostring(status))
