@@ -15,6 +15,7 @@ function M.new(options)
     local runtime = Lifecycle.new(registry, {resolveService = options.resolveService})
     local self = {registry = registry, categories = categories, runtime = runtime}
     function self:registerCategory(...) return categories:registerCategory(...) end
+    function self:setCategory(...) return categories:setCategory(...) end
     function self:registerTemplate(...) return registry:registerTemplate(...) end
     function self:registerTemplates(...) return registry:registerTemplates(...) end
     function self:loadTemplatesFromRegister() return registry:loadTemplatesFromRegister() end

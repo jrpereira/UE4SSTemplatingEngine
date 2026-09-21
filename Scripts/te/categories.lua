@@ -2,7 +2,7 @@ local U = require('te.util')
 local M = {}
 
 function M.new()
-    local self = {_categories = {}}
+    local self = {_categories = {}, _registered = {}}
     function self:registerCategory(module, categories)
         U.text(module, 'category')
         assert(module:match('^[%a_][%w_]*$'), 'category: invalid root name')
@@ -13,26 +13,36 @@ function M.new()
             U.text(category, module .. ' subcategory')
             assert(category:match('^[%a_][%w_]*$'), 'invalid subcategory: ' .. category)
             assert(not registered[category], 'duplicate category: ' .. module .. '.' .. category)
-            registered[category] = {}
+            registered[category] = {visible = 0, count = 0, templates = {}}
         end
         self._categories[module] = registered
+        for category in pairs(registered) do
+            self._registered[module .. '.' .. category] = true
+        end
     end
     function self:contains(name)
+        return self._registered[name] == true
+    end
+    function self:getCategory(name)
+        U.text(name, 'category')
+        assert(self:contains(name), 'unregistered category: ' .. name)
         local module, category = name:match('^([^.]+)%.([^.]+)$')
-        if module then
-            return type(self._categories[module]) == 'table'
-                and type(self._categories[module][category]) == 'table'
+        return self._categories[module][category]
+    end
+    function self:setCategory(name, values)
+        assert(type(values) == 'table', name .. ': category values must be a table')
+        local target = self:getCategory(name)
+        local pending = {}
+        for key, value in pairs(values) do
+            U.text(key, name .. ' property')
+            pending[key] = value
         end
-        return type(self._categories[name]) == 'table'
+        for key, value in pairs(pending) do target[key] = value end
+        return target
     end
     function self:list()
         local names = {}
-        for module, categories in pairs(self._categories) do
-            names[#names + 1] = module
-            for category in pairs(categories) do
-                names[#names + 1] = module .. '.' .. category
-            end
-        end
+        for name in pairs(self._registered) do names[#names + 1] = name end
         table.sort(names)
         return names
     end

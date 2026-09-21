@@ -109,7 +109,7 @@ local ordinary = Menu.generate(registryFor(many))
 local model, indices = modelFor(ordinary)
 check(not model.items[indices[ordinary.selectors['player.stats'].id]].ammTabs)
 local empty = Menu.generate(registryFor({}))
-check(#empty.rows == 0 and #empty.warnings == 3)
+check(#empty.rows == 0 and #empty.warnings == 2)
 local bad = fixture(2); bad.name = 'Injected\n[Setting.Bad]'
 rejects(function() Menu.generate(registryFor(bad)) end, 'unsupported separators')
 bad = fixture(2); bad.actions = {Only = bad.actions[1]}

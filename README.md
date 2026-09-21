@@ -70,4 +70,6 @@ A template file may return one template or a nested array of templates. Template
 
 Only categories with registered templates appear in the menu. A host may register additional categories before loading templates.
 
+Every registered category starts as `{ visible = 0, count = 0, templates = {} }`. Category metadata can then be updated in place. For example, `te:setCategory("player.quickslots", { visible = 1 })` sets `_categories.player.quickslots.visible` while preserving `count` and `templates`. When registered files are loaded successfully, TE increments the category's `count` and appends each loaded template object to its `templates` array.
+
 > The current `0.0.17` menu-test build exercises registration, validation, menu generation, persistence, and Apply callbacks. Native discovery, gameplay input, and visual cutover are still under development.

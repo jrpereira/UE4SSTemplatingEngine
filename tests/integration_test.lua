@@ -49,10 +49,12 @@ stop(); stop(); check(unsubscribed == 1)
 -- Exercise the actual text loader with a real file and a restricted environment.
 local path = 'work/loader-fixture.lua'
 local file = assert(io.open(path, 'wb'))
-file:write('return {collection="Loader",name="Loaded",category="player",render=function() return token end}')
+file:write('return {collection="Loader",name="Loaded",category="player.stats",render=function() return token end}')
 file:close()
 local actual = TE.new({listFiles = function() return {path} end, environment = function() return {token = 17} end})
 check(actual:loadTemplatesFromRegister() == 1)
 check(actual.registry.templates[1].template.render() == 17)
+check(actual.categories._categories.player.stats.count == 1
+    and actual.categories._categories.player.stats.templates[1] == actual.registry.templates[1].template)
 os.remove(path)
 print('integration: ' .. checks .. ' checks passed')
