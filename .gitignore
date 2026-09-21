@@ -1,0 +1,19 @@
+# Local build, verification, deployment, and captured runtime data
+/work/
+/outputs/
+
+# User state and generated installation payloads
+config.ini
+enabled.txt
+identity-catalog.lua
+menu-profile.lua
+mod_settings.ini
+
+# Runtime and tooling artifacts
+*.log
+*.dmp
+*.zip
+*.sha256
+__pycache__/
+*.py[cod]
+.pytest_cache/

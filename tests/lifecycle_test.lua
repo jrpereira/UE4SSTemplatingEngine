@@ -4,10 +4,10 @@ local Registry = require('te.registry')
 local Lifecycle = require('te.lifecycle')
 local checks = 0
 local function check(value) assert(value); checks = checks + 1 end
-local categories = Categories.new(); categories:registerCategory('player', {'actions'})
+local categories = Categories.new(); categories:registerCategory('player', {'quickslots'})
 local calls, failAttach, failDetach = {}, false, false
 local function template(name)
-    return {collection = 'Tests', category = 'player.actions', name = name,
+    return {collection = 'Tests', category = 'player.quickslots', name = name,
         actions = {{name = 'Group', slots = 1, type = 'any'}},
         attach = function(self, context, spec, previous)
             calls[#calls + 1] = self.name .. ':attach'
@@ -32,45 +32,46 @@ local registry = Registry.new(categories, {execute = function() return {template
 registry:registerTemplate('test.lua'); registry:loadTemplatesFromRegister()
 local a, b = registry.templates[1].id, registry.templates[2].id
 local runtime = Lifecycle.new(registry)
-local context = {original = 123}
-check(runtime:render('player.actions', context, {}, 'created') == 'ignored')
+local context = {playerActions = dofile('tests/support/service.lua')({original = 123})}
+check(runtime:render('player.quickslots', context, {}, 'created') == 'ignored')
 local spec = {value = 7}
-check(runtime:apply('player.actions', a, spec, context))
-local firstHandle = runtime.active['player.actions'].handle
+check(runtime:apply('player.quickslots', a, spec, context))
+local firstHandle = runtime.active['player.quickslots'].handle
 check(spec.value == 7)
-local id, config = runtime:selection('player.actions'); check(id == a and config.value == 7)
-config.value = 99; check(select(2, runtime:selection('player.actions')).value == 7)
-check(runtime:apply('player.actions', a, {value = 8}, context))
-check(runtime.active['player.actions'].handle == firstHandle and firstHandle.original == 123)
+local id, config = runtime:selection('player.quickslots'); check(id == a and config.value == 7)
+config.value = 99; check(select(2, runtime:selection('player.quickslots')).value == 7)
+check(runtime:apply('player.quickslots', a, {value = 8}, context))
+check(runtime.active['player.quickslots'].handle == firstHandle and firstHandle.original == 123)
 failAttach = true
-check(not runtime:apply('player.actions', a, {value = 9}, context))
-check(select(2, runtime:selection('player.actions')).value == 8 and firstHandle.value == 8)
+check(not runtime:apply('player.quickslots', a, {value = 9}, context))
+check(select(2, runtime:selection('player.quickslots')).value == 8 and firstHandle.value == 8)
 failAttach = false; failDetach = true
-check(not runtime:apply('player.actions', b, {}, context))
-check(runtime:selection('player.actions') == a)
+check(not runtime:apply('player.quickslots', b, {}, context))
+check(runtime:selection('player.quickslots') == a)
 failDetach = false
-check(runtime:apply('player.actions', b, {}, context))
+check(runtime:apply('player.quickslots', b, {}, context))
 check(calls[#calls - 1] == 'A:detach:switch' and calls[#calls] == 'B:attach')
-check(context.restored == 123)
-check(runtime:render('player.actions', context, {}, 'created') == 'not_ready')
+check(context.playerActions.restored == 123)
+check(runtime:render('player.quickslots', context, {}, 'created') == 'not_ready')
 local before = #calls
-check(runtime:render('player.actions', context, {ready = true}, 'ready') == 'applied')
-check(runtime:apply('player.actions', nil, {}, context))
-check(runtime:selection('player.actions') == nil and calls[#calls] == 'B:detach:none')
+check(runtime:render('player.quickslots', context, {ready = true}, 'ready') == 'applied')
+check(runtime:apply('player.quickslots', nil, {}, context))
+check(runtime:selection('player.quickslots') == nil and calls[#calls] == 'B:detach:none')
 before = #calls
-check(runtime:detach('player.actions', context, 'disable') and #calls == before)
-local function decode(values) return {['player.actions'] = {id = a, configuration = values}} end
+check(runtime:detach('player.quickslots', context, 'disable') and #calls == before)
+local function decode(values) return {['player.quickslots'] = {id = a, configuration = values}} end
 check(runtime:commit({revision = 1, values = {value = 10}}, decode, context))
 before = #calls
 check(runtime:commit({revision = 1, values = {value = 11}}, decode, context) and #calls == before)
 failAttach = true
 check(not runtime:commit({revision = 2, values = {value = 12}}, decode, context))
-check(runtime.revision == 1 and select(2, runtime:selection('player.actions')).value == 10)
+check(runtime.revision == 1 and select(2, runtime:selection('player.quickslots')).value == 10)
 failAttach = false
 check(runtime:commit({revision = 2, values = {value = 12}}, decode, context))
-check(runtime:detach('player.actions', context, 'world_invalidated'))
-check(calls[#calls] == 'A:detach:world_invalidated')
-check(not runtime:apply('player.actions', 'missing', {}, context))
+before = #calls
+check(runtime:detach('player.quickslots', nil, 'world_invalidated'))
+check(#calls == before and runtime:selection('player.quickslots') == nil)
+check(not runtime:apply('player.quickslots', 'missing', {}, context))
 failAttach = true
-check(not runtime:apply('player.actions', a, {}, context) and runtime:selection('player.actions') == nil)
+check(not runtime:apply('player.quickslots', a, {}, context) and runtime:selection('player.quickslots') == nil)
 print('lifecycle: ' .. checks .. ' checks passed')

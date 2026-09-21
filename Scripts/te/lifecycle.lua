@@ -2,9 +2,24 @@ local U = require('te.util')
 local V = require('te.validation')
 local M = {}
 
-function M.new(registry)
+function M.new(registry, options)
+    options = options or {}
     local self = {active = {}, revision = 0}
     local busy = false
+    local function resolveService(category, context)
+        local service
+        if options.resolveService then service = options.resolveService(category, context)
+        elseif category == 'player.quickslots' then
+            service = type(context) == 'table' and context.playerActions or nil
+        else error('no service resolver for category: ' .. category) end
+        assert(type(service) == 'table', category .. ': category service must be a table')
+        if category == 'player.quickslots' then
+            for _, method in ipairs({'valid', 'same', 'identity', 'parent'}) do
+                assert(type(service[method]) == 'function', 'quickslots service requires ' .. method)
+            end
+        end
+        return service
+    end
     local function guarded(operation)
         if busy then return nil, 'reentrant lifecycle operation' end
         busy = true
@@ -14,9 +29,14 @@ function M.new(registry)
         return result, err
     end
     local function detach(category, context, reason)
+        if reason == 'world_invalidated' then
+            self.active[category] = nil
+            return true
+        end
         local current = self.active[category]
         if not current then return true end
-        local ok, result, err = pcall(current.template.detach, current.template, context, current.handle, reason)
+        local service = resolveService(category, context)
+        local ok, result, err = pcall(current.template.detach, current.template, service, current.handle, reason)
         if not ok then return nil, tostring(result) end
         if result ~= true then return nil, err or 'detach must return true on success' end
         self.active[category] = nil
@@ -34,13 +54,15 @@ function M.new(registry)
             V.template(entry.template, registry.categories, entry.location, true)
             assert(type(configuration) == 'table', 'committed configuration must be a table')
             local spec = U.copy(configuration)
+            -- Validate before releasing an old attachment, then resolve freshly for each call.
+            resolveService(category, context)
             local previous = self.active[category]
             if previous and previous.id ~= identity then
                 local ok, err = detach(category, context, 'switch')
                 if not ok then return nil, err end
                 previous = nil
             end
-            local ok, handle, err = pcall(entry.template.attach, entry.template, context,
+            local ok, handle, err = pcall(entry.template.attach, entry.template, resolveService(category, context),
                 U.copy(spec), previous and previous.handle or nil)
             if not ok then return nil, tostring(handle) end
             if handle == nil or handle == false then return nil, err or 'attach returned no handle' end
@@ -52,7 +74,7 @@ function M.new(registry)
         return guarded(function()
             local current = self.active[category]
             if not current then return 'ignored' end
-            local status, err = current.template:render(context, current.handle, target, reason)
+            local status, err = current.template:render(resolveService(category, context), current.handle, target, reason)
             assert(status == 'applied' or status == 'not_ready' or status == 'ignored',
                 'invalid render status: ' .. tostring(status))
             return status, err

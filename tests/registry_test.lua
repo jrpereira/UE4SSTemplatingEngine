@@ -12,12 +12,15 @@ local function rejects(fn, fragment)
 end
 local categories = Categories.new()
 dofile('categories.lua')(function(...) categories:registerCategory(...) end)
-check(categories:contains('player') and categories:contains('npc.stats'))
-rejects(function() categories:registerCategory('player', {}) end, 'duplicate category')
+check(table.concat(categories:list(), ',') == 'npc,npc.intent,npc.level,npc.melee,npc.pawn,player,player.charges,player.compass,player.notifications,player.quickslots,player.self,player.stats,player.wheel')
+check(categories:contains('player') and categories:contains('npc'))
+rejects(function() categories:registerCategory('player', {'quickslots'}) end, 'duplicate category')
 rejects(function() categories:registerCategory('other', {'a', 'a'}) end, 'duplicate category')
 check(not categories:contains('other'))
+check(V.template({collection='Tests',name='Notice',category='player.notifications'}, categories, 'notice.lua').category == 'player.notifications')
+check(not categories:contains('player.actions') and not categories:contains('quickslots'))
 local function template(name)
-    return {collection = 'Tests', name = name or 'First', category = 'player.actions',
+    return {collection = 'Tests', name = name or 'First', category = 'player.quickslots',
         actions = {A = {name = 'Alpha', slots = 4, type = 'any'}}}
 end
 local sources = {['a.lua'] = template(), ['b.lua'] = {{template('Second')}, {}}}
@@ -32,7 +35,7 @@ check(registry:loadTemplatesFromRegister() == 2 and calls == 2)
 check(registry:loadTemplatesFromRegister() == 0 and calls == 2)
 check(#registry.templates == 2)
 check(U.identity(template()) ~= U.identity(template('Second')))
-rejects(function() V.flatten({category = 'player.actions'}, categories, 'bad.lua') end, 'bad.lua.collection')
+rejects(function() V.flatten({category = 'player.quickslots'}, categories, 'bad.lua') end, 'bad.lua.collection')
 local invalid = template(); invalid.category = 'npc.actions'
 rejects(function() V.flatten(invalid, categories, 'bad.lua') end, 'unregistered category')
 invalid = template(); invalid.actions = nil
@@ -45,6 +48,11 @@ invalid = template(); invalid.actions.A.slots = 0 / 0
 rejects(function() V.flatten(invalid, categories, 'bad.lua') end, 'positive integer')
 rejects(function() V.orderedGroups(template()) end, 'explicit group order required')
 check(V.orderedGroups(template(), {'A'})[1].value.name == 'Alpha')
+local declared = template(); declared.actionOrder = {'A'}
+check(V.orderedGroups(declared)[1].key == 'A')
+rejects(function() V.orderedGroups(declared, {'B'}) end, 'cannot override declared actionOrder')
+declared.actionOrder = {'Missing'}
+rejects(function() V.template(declared, categories, 'declared', false) end, 'invalid/duplicate group order entry')
 rejects(function() V.orderedGroups(template(), {'A', 'A'}) end, 'duplicate')
 rejects(function() V.template(template(), categories, 'runtime', true) end, 'runtime.attach')
 sources['c.lua'] = template('Third'); sources['d.lua'] = template('First')

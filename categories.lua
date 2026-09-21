@@ -1,5 +1,5 @@
 -- Core definitions; invoked before registered templates are evaluated.
 return function(registerCategory)
-    registerCategory('player', {'actions', 'stats', 'charges', 'self', 'compass'})
-    registerCategory('npc', {'stats', 'self'})
+    registerCategory('player', {'quickslots', 'stats', 'charges', 'self', 'compass', 'notifications', 'wheel'})
+    registerCategory('npc', {'intent', 'level', 'melee', 'pawn'})
 end

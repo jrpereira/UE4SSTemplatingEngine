@@ -12,7 +12,7 @@ function M.new(options)
     local core = options.coreCategories or assert(loadfile(options.categoriesPath or 'categories.lua', 't'))()
     core(function(...) categories:registerCategory(...) end)
     local registry = Registry.new(categories, options)
-    local runtime = Lifecycle.new(registry)
+    local runtime = Lifecycle.new(registry, {resolveService = options.resolveService})
     local self = {registry = registry, categories = categories, runtime = runtime}
     function self:registerCategory(...) return categories:registerCategory(...) end
     function self:registerTemplate(...) return registry:registerTemplate(...) end

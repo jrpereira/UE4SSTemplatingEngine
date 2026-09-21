@@ -13,7 +13,7 @@ local dmmPath = assert(os.getenv('TE_DMM_CHOICES'), 'TE_DMM_CHOICES required for
 local ammPath = assert(os.getenv('TE_AMM_PRESENTATION'), 'TE_AMM_PRESENTATION required for actual decorator tests')
 local Choices, Presentation = dofile(dmmPath), dofile(ammPath)
 local function fixture(last, name)
-    return {collection = 'Tests', name = name or 'Quickslots++', category = 'player.actions', actions = {
+    return {collection = 'Tests', name = name or 'Quickslots++', category = 'player.quickslots', actions = {
         {name = 'Consumables', slots = 4, type = 'consumables'},
         {name = 'Abilities', slots = 4, type = 'abilities'},
         {name = 'Extra', slots = last, type = 'any'},
@@ -21,7 +21,7 @@ local function fixture(last, name)
 end
 local function registryFor(templates)
     local categories = Categories.new()
-    categories:registerCategory('player', {'actions', 'stats'})
+    categories:registerCategory('player', {'quickslots', 'stats'})
     local registry = Registry.new(categories, {execute = function() return templates end})
     registry:registerTemplate('fixture.lua'); registry:loadTemplatesFromRegister()
     return registry
@@ -39,9 +39,23 @@ for _, last in ipairs({2, 5}) do
     local result = Menu.generate(registryFor(fixture(last)))
     firstResult = firstResult or result
     local model, indices = modelFor(result)
-    local selector = result.selectors['player.actions']
+    local selector = result.selectors['player.quickslots']
     local selected = next(selector.byValue)
-    local definition = result.definitions['player.actions'][selected]
+    local definition = result.definitions['player.quickslots'][selected]
+    check(model.items[indices[selector.id]].ammFont == 2)
+    check(model.items[indices[definition.access]].ammFont == 2)
+    check(model.items[indices[selector.id]].ammGroup.heading == false)
+    check(model.items[indices[definition.access]].ammGroup.heading == false)
+    local activationGroup = model.items[indices[definition.groups['1'].key]].group
+    local blocks, previous = 0, nil
+    for _, item in ipairs(model.items) do
+        if item.group == activationGroup and previous ~= activationGroup then blocks = blocks + 1 end
+        previous = item.group
+    end
+    check(blocks == 1)
+    check(model.items[indices[definition.direct['1'][1].key]].label == 'Slot 1 (consumables)')
+    check(model.items[indices[definition.direct['2'][1].key]].label == 'Slot 5 (abilities)')
+    check(model.items[indices[definition.shared[1].key]].label == 'Slot 1')
     local function visibleKeys()
         local visibility, count = model:visibility(), 0
         for i, item in ipairs(model.items) do
@@ -66,11 +80,11 @@ for _, last in ipairs({2, 5}) do
     check(not visible[indices[definition.groups['1'].key]])
     check(visible[indices[definition.groups['2'].key]])
     local values = {}; for i, item in ipairs(model.items) do values[item.id] = model.pending[i] end
-    local decoded = result.decode(values)['player.actions']
+    local decoded = result.decode(values)['player.quickslots']
     check(decoded.id == selector.byValue[selected] and decoded.configuration.firstGroupDefault)
     check(#decoded.configuration.shared == math.max(4, last))
     values[selector.id] = 0
-    check(result.decode(values)['player.actions'].id == nil)
+    check(result.decode(values)['player.quickslots'].id == nil)
     values[definition.shared[1].key] = 255
     rejects(function() result.decode(values) end, 'invalid key')
 end
@@ -79,11 +93,11 @@ local initial = Menu.generate(baseRegistry)
 local more = Menu.generate(registryFor({fixture(2, 'AAA'), fixture(2)}), {catalog = initial.catalog})
 local originalId = baseRegistry.templates[1].id
 local function valueFor(result, identity)
-    for value, id in pairs(result.selectors['player.actions'].byValue) do if id == identity then return value end end
+    for value, id in pairs(result.selectors['player.quickslots'].byValue) do if id == identity then return value end end
 end
 check(valueFor(initial, originalId) == valueFor(more, originalId))
-local originalDef = initial.definitions['player.actions'][valueFor(initial, originalId)]
-local moreDef = more.definitions['player.actions'][valueFor(more, originalId)]
+local originalDef = initial.definitions['player.quickslots'][valueFor(initial, originalId)]
+local moreDef = more.definitions['player.quickslots'][valueFor(more, originalId)]
 check(originalDef.shared[1].key == moreDef.shared[1].key)
 check(initial.catalog.next < more.catalog.next)
 local removed = Menu.generate(registryFor(fixture(2, 'AAA')), {catalog = more.catalog})

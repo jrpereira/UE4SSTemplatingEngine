@@ -1,5 +1,6 @@
 local U = require('te.util')
 local V = require('te.validation')
+local Provider = require('te.provider_settings')
 local M = {}
 
 local function text(value)
@@ -55,7 +56,9 @@ function M.generate(registry, options)
         for _, name in ipairs(names) do lines[#lines + 1] = name .. '=' .. tostring(fields[name]) end
         lines[#lines + 1] = ''
     end
-    emit('Mod', {Id = 'UE4SSTemplatingEngine', Name = 'Templates', Version = '0.1.0'})
+    emit('Mod', {Id = 'UE4SSTemplatingEngine', Name = 'Templates', Version = '0.1.0',
+        Description = options.description and text(options.description) or nil})
+    emit('Category.Templates', {DecoHeading = 0})
     local function row(fields)
         assert(#rows < 256, 'generated menu exceeds DMM limit of 256 settings')
         fields.ConfigFile, fields.ConfigSection, fields.ConfigKey = 'config.ini', 'Templates', fields.Id
@@ -63,18 +66,18 @@ function M.generate(registry, options)
         emit('Setting.' .. fields.Id, fields)
         return fields.Id
     end
-    local function picker(settingId, label, group, values, labels, source, visible, compact)
+    local function picker(settingId, label, group, values, labels, source, visible, compact, level)
         return row({Id = settingId, Label = text(label), Group = group, Type = 'picker',
             PresetValues = table.concat(values, '|'), PresetLabels = table.concat(labels, '|'), Default = values[1],
-            VisibleWhen = source, VisibleValues = visible,
+            VisibleWhen = source, VisibleValues = visible, DecoLevel = level,
             DecoType = compact and #values <= 8 and 'tab' or nil})
     end
-    local function group(identity, label, selector, selected, source, visible, level)
+    local function group(identity, label, selector, selected, source, visible, level, heading)
         local groupId = id({'group', identity})
         if not groups[groupId] then
             groups[groupId] = true
             emit('Category.' .. groupId, {VisibleWhen = source, VisibleValues = visible,
-                DecoLevel = level or 3, DecoLabelWhen = selector,
+                DecoLevel = level or 3, DecoHeading = heading, DecoLabelWhen = selector,
                 DecoLabels = tostring(selected) .. ':' .. text(label)})
         end
         return groupId
@@ -99,6 +102,13 @@ function M.generate(registry, options)
         perCategory[category] = perCategory[category] or {}
         table.insert(perCategory[category], entry)
     end
+    -- Persist the historical quickslots namespace so existing config keys and
+    -- selected template values survive the public category rename unchanged.
+    local function storageIdentity(entry)
+        if entry.template.category ~= 'player.quickslots' then return entry.id end
+        return U.identity({collection=entry.template.collection,
+            category='player.actions', name=entry.template.name})
+    end
     local decoded = {}
     for _, category in ipairs(registry.categories:list()) do
         local available = perCategory[category]
@@ -106,28 +116,28 @@ function M.generate(registry, options)
             warnings[#warnings + 1] = category .. ': empty category omitted; DMM cannot render a None-only picker'
         else
             assert(#available <= 63, category .. ': more than 63 templates exceeds picker capacity including None')
-            local selector = id({'selector', category})
+            local selector = id({'selector', category == 'player.quickslots' and 'player.actions' or category})
             local values, labels, byValue = {0}, {'None'}, {}
             for _, entry in ipairs(available) do
-                local value = allocate({'template', entry.id})
+                local value = allocate({'template', storageIdentity(entry)})
                 values[#values + 1], labels[#labels + 1] = value, text(entry.template.name)
                 byValue[value] = entry.id
             end
             local categoryLabel = (options.categoryLabels or {})[category]
                 or category:gsub('%.', ' '):gsub('(%a)([%w_]*)', function(a, b) return a:upper() .. b end)
-            picker(selector, categoryLabel, 'Templates', values, labels, nil, nil, true)
+            picker(selector, categoryLabel, 'Templates', values, labels, nil, nil, true, 2)
             selectors[category] = {id = selector, byValue = byValue}
             decoded[category] = {}
             for _, entry in ipairs(available) do
-                local template, identity = entry.template, entry.id
+                local template, identity = entry.template, storageIdentity(entry)
                 local value = allocate({'template', identity})
-                local definition = {id = identity, fields = {}}
+                local definition = {id = entry.id, fields = {}}
                 decoded[category][value] = definition
-                if category == 'player.actions' then
-                    local ordered = V.orderedGroups(template, (options.groupOrders or {})[identity])
+                if category == 'player.quickslots' then
+                    local ordered = V.orderedGroups(template, (options.groupOrders or {})[entry.id])
                     local access = id({'access', identity})
-                    local accessGroup = group(key({identity, 'access'}), 'Access Method', selector, value, selector, value)
-                    picker(access, 'Access Method', accessGroup, {0, 1}, {'1 key per slot', 'Activate group first'}, nil, nil, true)
+                    local accessGroup = group(key({identity, 'access'}), 'Access Method', selector, value, selector, value, 3, 0)
+                    picker(access, 'Access Method', accessGroup, {0, 1}, {'1 key per slot', 'Activate group first'}, nil, nil, true, 2)
                     local default = id({'first_default', identity})
                     picker(default, 'First group is default (needs no key)', accessGroup, {0, 1}, {'Off', 'On'}, access, 1, true)
                     definition.access, definition.firstDefault = access, default
@@ -144,9 +154,12 @@ function M.generate(registry, options)
                         for slot = 1, g.slots do
                             slotIndex = slotIndex + 1
                             definition.direct[item.key][slot] = binding(key({identity, 'direct', g.name, slot}),
-                                'Slot ' .. slotIndex, directGroup, nil, nil, slotModes)
+                                'Slot ' .. slotIndex .. ' (' .. g.type .. ')', directGroup, nil, nil, slotModes)
                         end
-                        local activateGroup = group(key({identity, 'groups'}), 'Groups', selector, value, access, 1)
+                    end
+                    local activateGroup = group(key({identity, 'groups'}), 'Groups', selector, value, access, 1)
+                    for index, item in ipairs(ordered) do
+                        local g = item.value
                         definition.groups[item.key] = binding(key({identity, 'activate', g.name}), g.name,
                             activateGroup, index == 1 and default or nil, index == 1 and 0 or nil, {0, 2})
                     end
@@ -157,6 +170,28 @@ function M.generate(registry, options)
                     end
                 else
                     warnings[#warnings + 1] = category .. ': no category-specific renderer defined'
+                end
+                if template.providerSettings then
+                    definition.provider = {}
+                    for _, providerGroup in ipairs(Provider.normalize(template.providerSettings)) do
+                        local groupId = group(key({identity, 'provider', providerGroup.id}), providerGroup.label,
+                            selector, value, selector, value, providerGroup.level)
+                        for _, field in ipairs(providerGroup.fields) do
+                            local settingId = id({'provider', identity, field.id})
+                            local metadata = {Id=settingId, Label=field.label, Group=groupId, Type=field.type,
+                                Default=field.default, Description=field.description, DecoLevel=field.level}
+                            if field.type == 'picker' then
+                                metadata.PresetValues = table.concat(field.values, '|')
+                                metadata.PresetLabels = table.concat(field.labels, '|')
+                                metadata.DecoType = field.tab and 'tab' or nil
+                            else
+                                metadata.Minimum, metadata.Maximum, metadata.Step = field.min, field.max, field.step
+                                metadata.Suffix = field.suffix
+                            end
+                            row(metadata)
+                            definition.provider[field.id] = settingId
+                        end
+                    end
                 end
             end
         end
@@ -171,7 +206,8 @@ function M.generate(registry, options)
             local value = values[settingId]
             assert(type(value) == 'number' and value == value, 'missing/invalid setting ' .. settingId)
             if r.Type == 'integer' then
-                assert(value >= r.Minimum and value <= r.Maximum and value % 1 == 0, 'invalid key ' .. settingId)
+                assert(value >= r.Minimum and value <= r.Maximum and value % 1 == 0,
+                    (r.DecoType == 'keybind' and 'invalid key ' or 'invalid integer ') .. settingId)
             else
                 local found = false
                 for candidate in r.PresetValues:gmatch('[^|]+') do if value == tonumber(candidate) then found = true end end
@@ -187,6 +223,10 @@ function M.generate(registry, options)
             if definition then
                 selection.id = definition.id
                 local config = selection.configuration
+                if definition.provider then
+                    config.provider = {}
+                    for field, settingId in pairs(definition.provider) do config.provider[field] = values[settingId] end
+                end
                 if definition.access then
                     config.access = values[definition.access]
                     config.firstGroupDefault = config.access == 1 and values[definition.firstDefault] == 1

@@ -2,7 +2,7 @@ package.path = 'Scripts/?.lua;' .. package.path
 local TE = require('te.init')
 local checks = 0
 local function check(value) assert(value); checks = checks + 1 end
-local template = {collection = 'Integration', category = 'player.actions', name = 'Integrated',
+local template = {collection = 'Integration', category = 'player.quickslots', name = 'Integrated',
     actions = {{name = 'Actions', slots = 2, type = 'any'}}}
 local attaches, detached = 0, 0
 function template:attach(context, spec, previous)
@@ -24,13 +24,14 @@ check(executions == 1 and loads[1] == 1 and loads[2] == 0)
 check(attaches == 0)
 local menu = te:generateMenu()
 local values = {}; for _, row in ipairs(menu.rows) do values[row.Id] = tonumber(row.Default) end
-local selector = menu.selectors['player.actions']
+local selector = menu.selectors['player.quickslots']
 values[selector.id] = next(selector.byValue)
 local callback, unsubscribed, outcomes = nil, 0, {}
 local stop = te:subscribeApplied({subscribe = function(provider, fn)
     check(provider == 'UE4SSTemplatingEngine'); callback = fn
     return function() unsubscribed = unsubscribed + 1 end
-end}, menu, function() return {} end, function(ok, errors) outcomes[#outcomes + 1] = {ok = ok, errors = errors} end)
+end}, menu, function() return {playerActions = dofile('tests/support/service.lua')()} end,
+function(ok, errors) outcomes[#outcomes + 1] = {ok = ok, errors = errors} end)
 check(attaches == 0) -- Editing values locally has no runtime effect.
 callback({providerId = 'SomeoneElse', revision = 1, values = values})
 check(attaches == 0)
@@ -40,7 +41,7 @@ callback({providerId = 'UE4SSTemplatingEngine', revision = 1, values = values})
 check(attaches == 1)
 values[selector.id] = 0
 callback({providerId = 'UE4SSTemplatingEngine', revision = 2, values = values})
-check(detached == 1 and te.runtime:selection('player.actions') == nil)
+check(detached == 1 and te.runtime:selection('player.quickslots') == nil)
 callback({providerId = 'UE4SSTemplatingEngine', revision = 3, values = {}})
 check(not outcomes[#outcomes].ok and te.runtime.revision == 2)
 stop(); stop(); check(unsubscribed == 1)

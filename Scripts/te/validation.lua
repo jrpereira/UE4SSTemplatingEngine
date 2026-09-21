@@ -1,4 +1,5 @@
 local U = require('te.util')
+local Provider = require('te.provider_settings')
 local M = {}
 
 function M.actions(actions, where)
@@ -26,7 +27,11 @@ function M.template(template, categories, where, runtime)
     U.text(template.category, where .. '.category')
     assert(categories:contains(template.category), where .. ': unregistered category ' .. template.category)
     U.text(template.name, where .. '.name')
-    if template.category == 'player.actions' then M.actions(template.actions, where .. '.actions') end
+    Provider.normalize(template.providerSettings)
+    if template.category == 'player.quickslots' then
+        M.actions(template.actions, where .. '.actions')
+        if template.actionOrder ~= nil then M.orderedGroups(template) end
+    end
     if template.contexts ~= nil then
         U.array(template.contexts, where .. '.contexts')
         for i, context in ipairs(template.contexts) do U.text(context, where .. '.contexts[' .. i .. ']') end
@@ -62,6 +67,14 @@ end
 -- Ordering is an explicit adapter input, not inferred from Lua map traversal.
 function M.orderedGroups(template, order)
     M.actions(template.actions, template.name .. '.actions')
+    if template.actionOrder ~= nil then
+        local count = U.array(template.actionOrder, 'actionOrder')
+        if order ~= nil then
+            assert(U.array(order, 'group order') == count, 'cannot override declared actionOrder')
+            for i = 1, count do assert(order[i] == template.actionOrder[i], 'cannot override declared actionOrder') end
+        end
+        order = template.actionOrder
+    end
     local actions, result, used = template.actions, {}, {}
     if type(next(actions)) == 'number' then
         assert(order == nil, 'array actions already define their order')
