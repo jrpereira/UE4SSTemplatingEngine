@@ -7,6 +7,7 @@ local te = TE.new({listFiles = function() return {} end})
 te:registerTemplate(path)
 check(te:loadTemplatesFromRegister() == 1)
 local entry = te.registry.templates[1]
+check(entry.template.settings.enabled == false)
 check(entry.template.actionOrder == nil)
 check(#entry.template.actions == 2)
 check(entry.template.actions[1].name == 'Abilities' and entry.template.actions[1].type == 'ability')
@@ -29,8 +30,9 @@ function service:same(a, b) return rawequal(a, b) end
 function service:identity(object) return object.id end
 function service:parent(object) return object.parent end
 local context = {playerActions = service,targets={['player.quickslots']=switcher}}
+entry.template.settings.enabled = true
 check(te.runtime:commit({revision = 1, values = values}, menu.decode, context))
-check(entry.template.widgetRenderingEnabled == false)
+check(not entry.template.widgetRenderingEnabled)
 check(te.runtime:render('player.quickslots', context, {kind='swap_prompt'}, 'created') == 'ignored')
 -- Exercise visual implementation only on this in-memory test instance.
 entry.template.widgetRenderingEnabled = true

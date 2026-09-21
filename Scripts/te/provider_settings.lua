@@ -30,7 +30,7 @@ end
 function M.normalize(declaration)
     assert(type(declaration) == 'table', 'settings must be a table')
     allowed(declaration, {enabled=true,groups=true,fields=true}, 'settings')
-    assert(declaration.enabled==false, 'settings.enabled must be false')
+    assert(type(declaration.enabled)=='boolean', 'settings.enabled must be boolean')
     local declaredGroups=declaration.groups or {}
     local declaredFields=declaration.fields or {}
     U.array(declaredGroups, 'settings.groups')

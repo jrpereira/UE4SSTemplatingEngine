@@ -10,7 +10,7 @@ local function rejects(fn, part)
 end
 local categories = C.new(); categories:registerCategory('player', {'quickslots'})
 local template = {collection = 'Robustness', name = 'Lifecycle', category = 'player.quickslots',
-    settings={enabled=false},
+    settings={enabled=true},
     actions = {A = {name = 'Alpha', slots = 1, type = 'any'}, B = {name = 'Beta', slots = 2, type = 'any'}}}
 local registry = R.new(categories, {execute = function() return template end})
 registry:registerTemplate('fixture.lua'); registry:loadTemplatesFromRegister()

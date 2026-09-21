@@ -47,7 +47,7 @@ te:registerTemplate("templates/my_quickslots.lua")
 te:registerTemplates("templates")
 ```
 
-Once templates are loaded, TE validates them, adds them to the mod menu, remembers the active template for each category, and invokes their lifecycle methods when the player applies a selection.
+Once templates are loaded, TE validates them, adds them to the mod menu, and remembers the active template for each category. It invokes lifecycle methods only while the selected template has `settings.enabled = true`.
 
 The `Templates` DMM page contains one template picker per populated category. TE also generates a DMM page for every registered category. When templates are available, the category page repeats that category's picker and contains the selected template's detailed controls, such as quickslot access mode and key assignments. Both picker views use the same persisted TE setting.
 
@@ -68,11 +68,11 @@ Creation-driven categories declare independent native targets with `subscribe = 
 
 A template file may return one template or a nested array of templates. Template files are ordinary Lua and can access the environment in which the host loads them, so install templates only from sources you trust.
 
-`attach` is called on activation and again when settings are applied. It should be idempotent and preserve the original game state. `render` responds to relevant discovered widgets or events. `detach` runs while objects are still valid and must restore owned changes. When the world is already invalid, TE forgets the active handle without calling template code.
+`attach` is called on activation and again when settings are applied. It should be idempotent and preserve the original game state. `render` responds to relevant discovered widgets or events. `detach` runs while objects are still valid and must restore owned changes. TE skips all three methods when `settings.enabled = false`. When the world is already invalid, TE forgets the active handle without calling template code.
 
 The `player.quickslots` service exposes `valid`, `same`, `identity`, and `parent`. A quickslots template calls these methods directly. TE resolves the current QuickslotsSwitcher and invokes `attach(service, target, configuration, previousHandle)` only when that target is valid. If it is unavailable, TE keeps the selection pending without calling template code. A declared category event retries the attachment with its resolved target, then invokes `render(service, handle, target, eventName)`. Handles retain provider-owned mutation and restoration state; templates do not rediscover or retain the category parent merely for later rendering.
 
-Every template declares `settings = { enabled = false }`, merging `groups` and `fields` into that table when it exposes menu controls. A fresh configuration therefore keeps the category selector at `None`; existing saved selections remain unchanged. TE validates committed `configuration.settings` values against any declared fields before invoking `attach`. Templates can import `require("te.widget")` for generic UE widget operations: `unwrap`, `property`, `number`, `translation`, `scale`, `opacity`, `setTranslation`, `setScale`, `setOpacity`, `snapshotSlot`, and `restoreSlot`. Layout policy, widget ownership, restoration journals, and category behavior stay in the template.
+Every template declares a boolean `settings.enabled`, merging `groups` and `fields` into that table when it exposes menu controls. Bundled templates default it to `false`, and a fresh configuration keeps the category selector at `None`; existing saved selections remain unchanged. A disabled template may remain selected, but TE records it without calling `attach`, `render`, or `detach`. TE validates committed `configuration.settings` values against any declared fields before invoking enabled lifecycle code. Templates can import `require("te.widget")` for generic UE widget operations: `unwrap`, `property`, `number`, `translation`, `scale`, `opacity`, `setTranslation`, `setScale`, `setOpacity`, `snapshotSlot`, and `restoreSlot`. Layout policy, widget ownership, restoration journals, and category behavior stay in the template.
 
 ## Built-in categories
 

@@ -8,6 +8,7 @@ function M.new(registry, options)
     options = options or {}
     local self = {active = {}, pending = {}, revision = 0}
     local busy = false
+    local function enabled(template) return template.settings.enabled == true end
     local function resolveService(category, context)
         local service
         if options.resolveService then service = options.resolveService(category, context)
@@ -53,7 +54,9 @@ function M.new(registry, options)
         end
         local current = self.active[category]
         if not current then return true end
-        if current.inert then self.active[category]=nil;return true end
+        if current.inert or current.suppressed or not enabled(current.template) then
+            self.active[category]=nil;return true
+        end
         local service = resolveService(category, context)
         local ok, result, err = pcall(current.template.detach, current.template, service, current.handle, reason)
         if not ok then return nil, tostring(result) end
@@ -69,10 +72,20 @@ function M.new(registry, options)
             if identity == nil then return detach(category, context, 'none') end
             local entry = assert(registry.byId[identity], 'unknown template identity')
             assert(entry.template.category == category, 'template category mismatch')
-            V.template(entry.template, registry.categories, entry.location, true)
+            V.template(entry.template, registry.categories, entry.location, enabled(entry.template))
             assert(type(configuration) == 'table', 'committed configuration must be a table')
             local spec = U.copy(configuration)
             Provider.validate(entry.template.settings, spec.settings)
+            local previous = self.active[category]
+            if not enabled(entry.template) then
+                if previous and previous.id ~= identity then
+                    local ok, err = detach(category, context, 'switch')
+                    if not ok then return nil, err end
+                end
+                self.pending[category]=nil
+                self.active[category]={id=identity,template=entry.template,configuration=spec,suppressed=true}
+                return true, 'disabled'
+            end
             if category=='menu.fixes' and entry.template.attach==nil
                 and entry.template.detach==nil and entry.template.render==nil then
                 self.pending[category]=nil
@@ -86,7 +99,7 @@ function M.new(registry, options)
                 self.pending[category] = {id=identity, template=entry.template, configuration=spec}
                 return true, 'not_ready'
             end
-            local previous = self.active[category]
+            if previous and previous.suppressed then self.active[category]=nil;previous=nil end
             if previous and previous.id ~= identity then
                 local ok, err = detach(category, context, 'switch')
                 if not ok then return nil, err end
@@ -120,7 +133,7 @@ function M.new(registry, options)
         return guarded(function()
             local current = self.active[category]
             if not current then return 'ignored' end
-            if current.inert then return 'ignored' end
+            if current.inert or current.suppressed or not enabled(current.template) then return 'ignored' end
             local status, err = current.template:render(resolveService(category, context), current.handle, target, reason)
             assert(status == 'applied' or status == 'not_ready' or status == 'ignored',
                 'invalid render status: ' .. tostring(status))
@@ -132,6 +145,7 @@ function M.new(registry, options)
             assert(Events.supports(category, event), 'unsupported ' .. tostring(category) .. ' event ' .. tostring(event))
             local desired = self.pending[category] or self.active[category]
             if not desired or not Events.interested(desired.template, event) then return 'ignored' end
+            if desired.suppressed or not enabled(desired.template) then return 'ignored' end
             if self.pending[category] then
                 local attached, why = apply(category, desired.id, desired.configuration, context)
                 if not attached then return nil, why end

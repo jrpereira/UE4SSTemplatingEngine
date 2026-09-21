@@ -8,7 +8,7 @@ local a,b=makeService({id='a'}),makeService({id='b'})
 local expected=a
 local function template(name)
     return {collection='Boundary',name=name,category='player.quickslots',
-        settings={enabled=false},
+        settings={enabled=true},
         actions={{name='Group',slots=1,type='ability'}},
         attach=function(self,service,target,spec,previous)
             check(service==expected and service.playerActions==nil)
@@ -78,7 +78,7 @@ check(overridden:detach('player.quickslots',nil,'world_invalidated'))
 
 local attacks=C.new();attacks:registerCategory('npc',{'attacks'})
 local class='/Game/_Dawnwalker/UI/_Unified/Combat/WBP_CombatTargetIndicator.WBP_CombatTargetIndicator_C'
-local attackTemplate={collection='Boundary',name='Attacks',category='npc.attacks',settings={enabled=false},subscribe={{path=class,
+local attackTemplate={collection='Boundary',name='Attacks',category='npc.attacks',settings={enabled=true},subscribe={{path=class,
     events={'created'},contexts={'combat'}}},
     attach=function(self,service,target) check(target.kind=='hud');return {} end,
     detach=function() return true end,render=function() return 'applied' end}

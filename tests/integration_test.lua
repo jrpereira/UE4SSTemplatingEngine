@@ -3,7 +3,7 @@ local TE = require('te.init')
 local checks = 0
 local function check(value) assert(value); checks = checks + 1 end
 local template = {collection = 'Integration', category = 'player.quickslots', name = 'Integrated',
-    settings = {enabled=false},
+    settings = {enabled=true},
     events = {'GroupSelected'},
     actions = {{name = 'Actions', slots = 2, type = 'any'}}}
 local attaches, detached, rendered = 0, 0, nil

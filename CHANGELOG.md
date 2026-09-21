@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Require `settings.enabled = false` on every template and keep fresh category selectors disabled without changing saved selections.
+- Require boolean `settings.enabled`; bundled templates default to `false`, and TE skips their lifecycle methods while disabled.
 
 - Validate category event interests and route declared events through service-first template callbacks.
 - Retry pending attachments when a declared category event arrives.

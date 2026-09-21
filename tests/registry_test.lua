@@ -44,8 +44,10 @@ rejects(function() categories:setCategory('missing', {visible=1}) end, 'unregist
 check(V.template({collection='Tests',name='Unknown',category='other.unknown',settings={enabled=false}}, categories, 'unknown.lua').category == 'other.unknown')
 rejects(function() V.template({collection='Tests',name='Missing Settings',category='other.unknown'},
     categories,'missing.lua') end,'settings must be a table')
-rejects(function() V.template({collection='Tests',name='Enabled',category='other.unknown',
-    settings={enabled=true}},categories,'enabled.lua') end,'settings.enabled must be false')
+check(V.template({collection='Tests',name='Enabled',category='other.unknown',
+    settings={enabled=true}},categories,'enabled.lua').settings.enabled == true)
+rejects(function() V.template({collection='Tests',name='Invalid Enabled',category='other.unknown',
+    settings={enabled=1}},categories,'enabled.lua') end,'settings.enabled must be boolean')
 rejects(function() categories:registerCategory('player', {'quickslots'}) end, 'duplicate category')
 rejects(function() categories:registerCategory('custom', {'a', 'a'}) end, 'duplicate category')
 check(not categories:contains('custom'))

@@ -8,7 +8,7 @@ local categories = Categories.new(); categories:registerCategory('player', {'qui
 local calls, failAttach, failDetach, deferAttach = {}, false, false, false
 local function template(name)
     return {collection = 'Tests', category = 'player.quickslots', name = name,
-        settings = {enabled=false},
+        settings = {enabled=true},
         events = name == 'A' and {'GroupSelected'} or {'SlotActivated'},
         actions = {{name = 'Group', slots = 1, type = 'any'}},
         attach = function(self, context, target, spec, previous)
@@ -32,14 +32,22 @@ local function template(name)
             return target.ready and 'applied' or 'not_ready'
         end}
 end
-local registry = Registry.new(categories, {execute = function() return {template('A'), template('B')} end})
+local disabled={collection='Tests',category='player.quickslots',name='Disabled',settings={enabled=false},
+    events={'GroupSelected'},actions={{name='Group',slots=1,type='any'}}}
+local registry = Registry.new(categories, {execute = function() return {template('A'), template('B'), disabled} end})
 registry:registerTemplate('test.lua'); registry:loadTemplatesFromRegister()
-local a, b = registry.templates[1].id, registry.templates[2].id
+local a, b, disabledId = registry.templates[1].id, registry.templates[2].id, registry.templates[3].id
 local runtime = Lifecycle.new(registry)
 local target = {}
 local context = {playerActions = dofile('tests/support/service.lua')({original = 123}),
     target=target,targets={['player.quickslots']=target}}
 check(runtime:render('player.quickslots', context, {}, 'created') == 'ignored')
+local before = #calls
+local disabledApplied, disabledWhy = runtime:apply('player.quickslots', disabledId, {}, context)
+check(disabledApplied and disabledWhy == 'disabled' and runtime:selection('player.quickslots') == disabledId)
+check(runtime:render('player.quickslots', context, {ready=true}, 'created') == 'ignored' and #calls == before)
+check(runtime:detach('player.quickslots', context, 'disable') and #calls == before
+    and runtime:selection('player.quickslots') == nil)
 local spec = {value = 7}
 check(runtime:apply('player.quickslots', a, spec, context))
 local firstHandle = runtime.active['player.quickslots'].handle
@@ -59,7 +67,7 @@ check(runtime:apply('player.quickslots', b, {}, context))
 check(calls[#calls - 1] == 'A:detach:switch' and calls[#calls] == 'B:attach')
 check(context.playerActions.restored == 123)
 check(runtime:render('player.quickslots', context, {}, 'created') == 'not_ready')
-local before = #calls
+before = #calls
 check(runtime:render('player.quickslots', context, {ready = true}, 'ready') == 'applied')
 check(runtime:apply('player.quickslots', nil, {}, context))
 check(runtime:selection('player.quickslots') == nil and calls[#calls] == 'B:detach:none')
