@@ -50,7 +50,8 @@ function M.normalize(declaration)
     for index, source in ipairs(declaredFields) do
         assert(type(source) == 'table', 'provider field must be a table')
         allowed(source, {id=true,label=true,group=true,type=true,order=true,default=true,values=true,
-            labels=true,min=true,max=true,step=true,suffix=true,tab=true,level=true,description=true}, 'provider field')
+            labels=true,min=true,max=true,step=true,suffix=true,tab=true,level=true,description=true,
+            after=true}, 'provider field')
         identifier(source.id, 'provider field id'); text(source.label, 'provider field label'); level(source.level)
         assert(not fields[source.id], 'duplicate provider field ' .. source.id)
         fields[source.id] = true
@@ -59,6 +60,8 @@ function M.normalize(declaration)
         field.order, field.index = order(source.order,index), index
         if field.description ~= nil then text(field.description, 'provider description') end
         if field.suffix ~= nil then text(field.suffix, 'provider suffix') end
+        assert(field.after == nil or field.after == 'AccessMethod',
+            'provider field after must be AccessMethod')
         assert(field.tab == nil or type(field.tab) == 'boolean', 'provider tab must be boolean')
         if field.type == 'integer' then
             assert(field.values == nil and field.labels == nil and not field.tab, 'integer cannot declare choices/tabs')

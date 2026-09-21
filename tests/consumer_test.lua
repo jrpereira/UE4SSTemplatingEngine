@@ -19,7 +19,7 @@ local definition = menu.definitions['player.quickslots'][selected]
 check(#definition.shared == 4)
 local values = {}; for _, row in ipairs(menu.rows) do values[row.Id] = tonumber(row.Default) end
 values[selector.id] = selected
-values[definition.access], values[definition.firstDefault] = 1, 1
+values[definition.access] = 1
 values[definition.shared[1].mode], values[definition.groups['1'].mode] = 1, 2
 local service = {}
 local switcher = {id='quickslots-switcher', children={{id='wheel:1'}, {id='wheel:2'}}}

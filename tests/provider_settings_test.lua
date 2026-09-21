@@ -13,7 +13,7 @@ local declaration={target='templates',enabled=true,groups={
     {id='Visuals',label='Visuals',level=4,order=1},
 },fields={
     {id='WheelsDisplayed',type='picker',values={1,2},labels={'One','Two'},default=2,
-        label='Wheels Displayed',group='Visuals',order=1,tab=true,level=4},
+        label='Wheels Displayed',group='Visuals',order=1,tab=true,level=4,after='AccessMethod'},
     {id='PrimaryWheel',type='picker',values={0,1},labels={'Consumables','Abilities'},default=0,
         label='Primary Wheel',group='Visuals',order=2,tab=true,level=4},
 }}
@@ -51,7 +51,7 @@ local index={}; for i,item in ipairs(items) do index[item.id]=i end
 local selector=menu.selectors['player.quickslots']; local value=next(selector.byValue)
 local def=menu.definitions['player.quickslots'][value]
 local provider=def.settings
-check(index[provider.WheelsDisplayed]>index[def.shared[1].mode])
+check(index[provider.WheelsDisplayed]==index[def.access]+1)
 check(index[provider.WheelsDisplayed]<index[provider.PrimaryWheel])
 check(index[provider.PrimaryOpacity]<index[provider.SecondaryX])
 check(items[index[provider.WheelsDisplayed]].ammTabs and items[index[provider.PrimaryX]].ammGroup.font==4)

@@ -51,7 +51,7 @@ Once templates are loaded, TE validates them, adds them to the mod menu, and rem
 
 The `Templates` DMM page always aggregates every loaded template. A category with `single = true` has one template picker. Other categories show one Yes/No picker per template and may activate several templates at once.
 
-Every template also declares where its detailed controls appear with `settings.target`. Use `"templates"` to put them on TE's generated category page. Use `"module"` to put them on the page named by `collection`. A module page still shows the complete selector or Yes/No list for each category represented by that module, while detailed option blocks are limited to templates from that module.
+Every template also declares its menu target with `settings.target`. Generated pages after `Templates` are grouped by category, such as `Player Quickslots` and `NPC Attacks`; templates from different collections share the appropriate category page.
 
 Generated key bindings follow AMM's mode-owned pairing contract. The mode picker survives as the composite row, uses `ammType=tab`, and declares `Pair=<key-setting-id>`. The integer key setting uses `ammType=keybind` without `Pair`; its normal DMM visibility determines whether the key component appears.
 

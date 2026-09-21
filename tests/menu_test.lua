@@ -61,7 +61,7 @@ for _, last in ipairs({2, 5}) do
     local scopePrefix = 'TE_'
     check(definition.scope == nil)
     check(selector.id == 'TE_Template' and definition.access == scopePrefix .. 'AccessMethod'
-        and definition.firstDefault == scopePrefix .. 'FirstGroupDefault')
+        and definition.firstDefault == nil and rowsById.TE_FirstGroupDefault == nil)
     check(definition.groups['1'].key == scopePrefix .. 'Group1'
         and definition.groups['2'].key == scopePrefix .. 'Group2')
     for slot = 1, 4 do
@@ -78,8 +78,7 @@ for _, last in ipairs({2, 5}) do
         end
     end
     check(model.items[indices[selector.id]].default==0 and definition.enabled==false)
-    check(model.items[indices[definition.access]].default == 1
-        and model.items[indices[definition.firstDefault]].default == 0)
+    check(model.items[indices[definition.access]].default == 1)
     check(model.items[indices[definition.groups['2'].key]].default == 164)
     for slot = 1, 4 do
         check(model.items[indices[definition.direct['1'][slot].key]].default == 48 + slot)
@@ -114,10 +113,8 @@ for _, last in ipairs({2, 5}) do
     check(visibleKeys() == 0)
     model:set(indices[selector.id], selected)
     check(visibleKeys() == 3 + math.max(4, last))
-    model:set(indices[definition.firstDefault], 1)
-    check(visibleKeys() == 2 + math.max(4, last))
     local visible = model:visibility()
-    check(not visible[indices[definition.groups['1'].key]])
+    check(visible[indices[definition.groups['1'].key]])
     check(visible[indices[definition.groups['2'].key]])
     model:set(indices[definition.access], 0)
     check(visibleKeys() == 8 + last)
@@ -125,10 +122,10 @@ for _, last in ipairs({2, 5}) do
         check(model.items[indices[slots[1].key]].ammGroup.font == 5)
     end
     model:set(indices[definition.access], 1)
-    check(visibleKeys() == 2 + math.max(4, last))
+    check(visibleKeys() == 3 + math.max(4, last))
     local values = {}; for i, item in ipairs(model.items) do values[item.id] = model.pending[i] end
     local decoded = result.decode(values)['player.quickslots']
-    check(decoded.id == selector.byValue[selected] and decoded.configuration.firstGroupDefault)
+    check(decoded.id == selector.byValue[selected] and not decoded.configuration.firstGroupDefault)
     check(#decoded.configuration.shared == math.max(4, last))
     values[selector.id] = 0
     check(result.decode(values)['player.quickslots'].id == nil)
@@ -239,36 +236,21 @@ for i=1,4 do routedTemplates[#routedTemplates+1]=routedAttack('Other Modules',i)
 local routedRegistry=Registry.new(routedCategories,{execute=function()return routedTemplates end})
 routedRegistry:registerTemplate('routed.lua');routedRegistry:loadTemplatesFromRegister()
 local routed=Menu.generate(routedRegistry)
-check(#routed.aggregate.rows==7 and #routed.pages==2 and next(routed.pageByCategory)==nil)
+check(#routed.aggregate.rows==7 and #routed.pages==2 and next(routed.pageByModule)==nil)
 check(#routed.multiSelectors['npc.attacks']==6)
 local routedSelector=routed.selectors['player.quickslots']
 local routedSelectorRow
 for _,item in ipairs(routed.aggregate.rows) do if item.Id==routedSelector.id then routedSelectorRow=item end end
 local choices=0 for _ in routedSelectorRow.PresetValues:gmatch('[^|]+') do choices=choices+1 end
 check(choices==6)
-local one=assert(routed.pageByModule['Module One'])
-local others=assert(routed.pageByModule['Other Modules'])
-check(one.name=='Module One' and one.module=='Module One' and others.name=='Other Modules')
-local oneOwned={};for _,entry in ipairs(routedRegistry.templates) do
-    if entry.template.collection=='Module One' then oneOwned[entry.id]=true end
-end
-local controls,details=0,0
-for _,item in ipairs(one.rows) do
-    if item._control then controls=controls+1
-    elseif not item._routeHidden then details=details+1;check(oneOwned[item._owner]) end
-end
-check(controls==7 and details>0)
-local oneValues={};for _,item in ipairs(one.rows) do oneValues[item.Id]=tonumber(item.Default) end
-local ownQuick
-for value,id in pairs(routedSelector.byValue) do if oneOwned[id] then ownQuick=value end end
-oneValues[routedSelector.id]=ownQuick
-local oneDecoded=one.decode(oneValues)
-check(oneDecoded['player.quickslots'].id==routedSelector.byValue[ownQuick])
-check(#oneDecoded['npc.attacks']==0)
-local externalQuick
-for value,id in pairs(routedSelector.byValue) do if not oneOwned[id] then externalQuick=value end end
-oneValues[routedSelector.id]=externalQuick
-check(one.decode(oneValues)['player.quickslots'].id==routedSelector.byValue[externalQuick])
+local quickPage=assert(routed.pageByCategory['player.quickslots'])
+local attackPage=assert(routed.pageByCategory['npc.attacks'])
+check(quickPage.name=='Player Quickslots' and quickPage.category=='player.quickslots'
+    and attackPage.name=='Npc Attacks' and attackPage.category=='npc.attacks')
+local quickControls,attackControls=0,0
+for _,item in ipairs(quickPage.rows) do if item._control then quickControls=quickControls+1 end end
+for _,item in ipairs(attackPage.rows) do if item._control then attackControls=attackControls+1 end end
+check(quickControls==1 and attackControls==6)
 local bad = fixture(2); bad.name = 'Injected\n[Setting.Bad]'
 rejects(function() Menu.generate(registryFor(bad)) end, 'unsupported separators')
 bad = fixture(2); bad.actions = {Only = bad.actions[1]}
