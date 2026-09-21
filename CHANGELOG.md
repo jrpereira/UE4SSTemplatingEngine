@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Split template selection into an aggregate `Templates` DMM page and generated category pages that own each template's detailed controls.
+- Add the DMM startup extension that injects generated category pages while keeping their settings rooted in TE's shared `config.ini`.
 - Add the `menu.controls` and `menu.templates` template categories.
 - Add the `other` category family with the `other.unknown` fallback category.
 - Store registered subcategories as `_categories[module][category]`, initialized with `visible`, `count`, and `templates`.

@@ -11,6 +11,8 @@ function M.new(registry, options)
         if options.resolveService then service = options.resolveService(category, context)
         elseif category == 'player.quickslots' then
             service = type(context) == 'table' and context.playerActions or nil
+        elseif type(context) == 'table' and type(context.services) == 'table' then
+            service = context.services[category]
         else error('no service resolver for category: ' .. category) end
         assert(type(service) == 'table', category .. ': category service must be a table')
         if category == 'player.quickslots' then

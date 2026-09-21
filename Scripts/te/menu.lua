@@ -49,9 +49,13 @@ function M.generate(registry, options)
     end
     local function id(parts) return 'TE_' .. allocate(parts) end
     local lines, rows, groups, bindings, selectors, warnings = {}, {}, {}, {}, {}, {}
+    local groupSections, groupOrder = {}, {}
+    local aggregateRows, pageRows, categoryLabels, currentCategory = {}, {}, {}, nil
     local function emit(section, fields)
         lines[#lines + 1] = '[' .. section .. ']'
-        local names = {}; for name in pairs(fields) do names[#names + 1] = name end
+        local names = {}; for name, value in pairs(fields) do
+            if value ~= nil and name:sub(1, 1) ~= '_' then names[#names + 1] = name end
+        end
         table.sort(names)
         for _, name in ipairs(names) do lines[#lines + 1] = name .. '=' .. tostring(fields[name]) end
         lines[#lines + 1] = ''
@@ -63,6 +67,9 @@ function M.generate(registry, options)
         assert(#rows < 256, 'generated menu exceeds DMM limit of 256 settings')
         fields.ConfigFile, fields.ConfigSection, fields.ConfigKey = 'config.ini', 'Templates', fields.Id
         rows[#rows + 1] = fields
+        fields._category = currentCategory
+        pageRows[currentCategory] = pageRows[currentCategory] or {}
+        pageRows[currentCategory][#pageRows[currentCategory] + 1] = fields
         emit('Setting.' .. fields.Id, fields)
         return fields.Id
     end
@@ -76,9 +83,12 @@ function M.generate(registry, options)
         local groupId = id({'group', identity})
         if not groups[groupId] then
             groups[groupId] = true
-            emit('Category.' .. groupId, {VisibleWhen = source, VisibleValues = visible,
+            local fields = {VisibleWhen = source, VisibleValues = visible,
                 DecoLevel = level or 3, DecoHeading = heading, DecoLabelWhen = selector,
-                DecoLabels = tostring(selected) .. ':' .. text(label)})
+                DecoLabels = tostring(selected) .. ':' .. text(label)}
+            groupSections[groupId] = fields
+            groupOrder[#groupOrder + 1] = groupId
+            emit('Category.' .. groupId, fields)
         end
         return groupId
     end
@@ -111,10 +121,14 @@ function M.generate(registry, options)
     end
     local decoded = {}
     for _, category in ipairs(registry.categories:list()) do
+        local categoryLabel = (options.categoryLabels or {})[category]
+            or category:gsub('%.', ' '):gsub('(%a)([%w_]*)', function(a, b) return a:upper() .. b end)
+        categoryLabels[category] = categoryLabel
         local available = perCategory[category]
         if not available then
             warnings[#warnings + 1] = category .. ': empty category omitted; DMM cannot render a None-only picker'
         else
+            currentCategory = category
             assert(#available <= 63, category .. ': more than 63 templates exceeds picker capacity including None')
             local selector = id({'selector', category == 'player.quickslots' and 'player.actions' or category})
             local values, labels, byValue = {0}, {'None'}, {}
@@ -123,9 +137,8 @@ function M.generate(registry, options)
                 values[#values + 1], labels[#labels + 1] = value, text(entry.template.name)
                 byValue[value] = entry.id
             end
-            local categoryLabel = (options.categoryLabels or {})[category]
-                or category:gsub('%.', ' '):gsub('(%a)([%w_]*)', function(a, b) return a:upper() .. b end)
             picker(selector, categoryLabel, 'Templates', values, labels, nil, nil, true, 2)
+            aggregateRows[#aggregateRows + 1] = rows[#rows]
             selectors[category] = {id = selector, byValue = byValue}
             decoded[category] = {}
             for _, entry in ipairs(available) do
@@ -196,13 +209,41 @@ function M.generate(registry, options)
             end
         end
     end
-    local manifest = table.concat(lines, '\n')
-    assert(#manifest <= 256 * 1024, 'generated manifest exceeds 256 KiB')
+    currentCategory = nil
+    local function append(target, section, fields)
+        target[#target + 1] = '[' .. section .. ']'
+        local names = {}
+        for name, value in pairs(fields) do
+            if value ~= nil and name:sub(1, 1) ~= '_' then names[#names + 1] = name end
+        end
+        table.sort(names)
+        for _, name in ipairs(names) do target[#target + 1] = name .. '=' .. tostring(fields[name]) end
+        target[#target + 1] = ''
+    end
+    local function providerManifest(providerId, providerName, selectedRows)
+        local output = {}
+        append(output, 'Mod', {Id=providerId, Name=providerName, Version='0.0.17',
+            Description=options.description and text(options.description) or nil})
+        local usedGroups = {}
+        for _, item in ipairs(selectedRows) do usedGroups[item.Group] = true end
+        if usedGroups.Templates then append(output, 'Category.Templates', {DecoHeading=0}) end
+        for _, groupId in ipairs(groupOrder) do
+            if usedGroups[groupId] then append(output, 'Category.' .. groupId, groupSections[groupId]) end
+        end
+        for _, item in ipairs(selectedRows) do append(output, 'Setting.' .. item.Id, item) end
+        local manifest = table.concat(output, '\n')
+        assert(#manifest <= 256 * 1024, 'generated manifest exceeds 256 KiB')
+        return manifest
+    end
     local schema = {}
     for _, r in ipairs(rows) do schema[r.Id] = r end
-    local function decode(values)
+    local function makeDecoder(requiredRows, includedCategories)
+      return function(values)
         assert(type(values) == 'table', 'Apply values must be a table')
-        for settingId, r in pairs(schema) do
+        local effective = {}
+        for settingId, r in pairs(schema) do effective[settingId] = tonumber(r.Default) end
+        for _, r in ipairs(requiredRows) do
+            local settingId = r.Id
             local value = values[settingId]
             assert(type(value) == 'number' and value == value, 'missing/invalid setting ' .. settingId)
             if r.Type == 'integer' then
@@ -213,11 +254,13 @@ function M.generate(registry, options)
                 for candidate in r.PresetValues:gmatch('[^|]+') do if value == tonumber(candidate) then found = true end end
                 assert(found, 'invalid choice ' .. settingId)
             end
+            effective[settingId] = value
         end
         local result = {}
-        local function readBinding(pair) return {key = values[pair.key], mode = values[pair.mode]} end
+        local function readBinding(pair) return {key = effective[pair.key], mode = effective[pair.mode]} end
         for category, selector in pairs(selectors) do
-            local definition = decoded[category][values[selector.id]]
+          if not includedCategories or includedCategories[category] then
+            local definition = decoded[category][effective[selector.id]]
             local selection = {configuration = {}}
             result[category] = selection
             if definition then
@@ -225,11 +268,11 @@ function M.generate(registry, options)
                 local config = selection.configuration
                 if definition.provider then
                     config.provider = {}
-                    for field, settingId in pairs(definition.provider) do config.provider[field] = values[settingId] end
+                    for field, settingId in pairs(definition.provider) do config.provider[field] = effective[settingId] end
                 end
                 if definition.access then
-                    config.access = values[definition.access]
-                    config.firstGroupDefault = config.access == 1 and values[definition.firstDefault] == 1
+                    config.access = effective[definition.access]
+                    config.firstGroupDefault = config.access == 1 and effective[definition.firstDefault] == 1
                     config.direct, config.groups, config.shared = {}, {}, {}
                     for groupKey, slots in pairs(definition.direct) do
                         config.direct[groupKey] = {}
@@ -239,11 +282,29 @@ function M.generate(registry, options)
                     for i, pair in ipairs(definition.shared) do config.shared[i] = readBinding(pair) end
                 end
             end
+          end
         end
         return result
+      end
     end
-    return {manifest = manifest, catalog = catalog, rows = rows, selectors = selectors,
-        definitions = decoded, warnings = warnings, decode = decode}
+    local aggregateId = 'UE4SSTemplatingEngine'
+    local aggregateManifest = providerManifest(aggregateId, 'Templates', aggregateRows)
+    local allCategories = {}; for category in pairs(selectors) do allCategories[category] = true end
+    local aggregate = {id=aggregateId, name='Templates', manifest=aggregateManifest, rows=aggregateRows,
+        decode=makeDecoder(aggregateRows, allCategories)}
+    local pages, pageByCategory, providers = {}, {}, {[aggregateId]=aggregate}
+    for _, category in ipairs(registry.categories:list()) do
+        local providerId = aggregateId .. '.' .. category
+        local included, selectedRows = {[category]=true}, pageRows[category] or {}
+        local page = {id=providerId, name=categoryLabels[category], category=category,
+            rows=selectedRows, manifest=providerManifest(providerId, categoryLabels[category], selectedRows)}
+        page.decode = makeDecoder(page.rows, included)
+        pages[#pages + 1], pageByCategory[category], providers[providerId] = page, page, page
+    end
+    return {manifest = aggregateManifest, fullManifest = table.concat(lines, '\n'), catalog = catalog,
+        rows = rows, selectors = selectors, definitions = decoded, warnings = warnings,
+        decode = makeDecoder(rows, allCategories), aggregate=aggregate, pages=pages,
+        pageByCategory=pageByCategory, providers=providers}
 end
 
 return M

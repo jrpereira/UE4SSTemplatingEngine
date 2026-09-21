@@ -47,6 +47,8 @@ te:registerTemplates("templates")
 
 Once templates are loaded, TE validates them, adds them to the mod menu, remembers the active template for each category, and invokes their lifecycle methods when the player applies a selection.
 
+The `Templates` DMM page contains one template picker per populated category. TE also generates a DMM page for every registered category. When templates are available, the category page repeats that category's picker and contains the selected template's detailed controls, such as quickslot access mode and key assignments. Both picker views use the same persisted TE setting.
+
 ## Template format
 
 Each template needs:

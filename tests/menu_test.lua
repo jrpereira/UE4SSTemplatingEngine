@@ -26,9 +26,10 @@ local function registryFor(templates)
     registry:registerTemplate('fixture.lua'); registry:loadTemplatesFromRegister()
     return registry
 end
-local function modelFor(result)
-    local parsed = Choices.parse(result.manifest)
-    Presentation.parse(result.manifest, parsed)
+local function modelFor(result, category)
+    local provider = category and assert(result.pageByCategory[category]) or result.aggregate
+    local parsed = Choices.parse(provider.manifest)
+    Presentation.parse(provider.manifest, parsed)
     local model = Choices.open({id = 'TE-test', choices = parsed, testOnly = true})
     assert(not model.error, model.error)
     local indices = {}; for i, item in ipairs(parsed) do indices[item.id] = i end
@@ -38,7 +39,11 @@ local firstResult
 for _, last in ipairs({2, 5}) do
     local result = Menu.generate(registryFor(fixture(last)))
     firstResult = firstResult or result
-    local model, indices = modelFor(result)
+    check(#result.aggregate.rows == 1 and #result.pages == 2
+        and result.pageByCategory['player.quickslots'].category == 'player.quickslots'
+        and #result.pageByCategory['player.quickslots'].rows == #result.rows
+        and #result.pageByCategory['player.stats'].rows == 0)
+    local model, indices = modelFor(result, 'player.quickslots')
     local selector = result.selectors['player.quickslots']
     local selected = next(selector.byValue)
     local definition = result.definitions['player.quickslots'][selected]
@@ -106,10 +111,10 @@ check(valueFor(initial, originalId) == valueFor(restored, originalId))
 local many = {}
 for i = 1, 8 do many[i] = {collection = 'Tests', category = 'player.stats', name = 'Stats ' .. i} end
 local ordinary = Menu.generate(registryFor(many))
-local model, indices = modelFor(ordinary)
+local model, indices = modelFor(ordinary, 'player.stats')
 check(not model.items[indices[ordinary.selectors['player.stats'].id]].ammTabs)
 local empty = Menu.generate(registryFor({}))
-check(#empty.rows == 0 and #empty.warnings == 2)
+check(#empty.rows == 0 and #empty.pages == 2 and #empty.warnings == 2)
 local bad = fixture(2); bad.name = 'Injected\n[Setting.Bad]'
 rejects(function() Menu.generate(registryFor(bad)) end, 'unsupported separators')
 bad = fixture(2); bad.actions = {Only = bad.actions[1]}

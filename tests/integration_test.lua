@@ -26,12 +26,16 @@ local menu = te:generateMenu()
 local values = {}; for _, row in ipairs(menu.rows) do values[row.Id] = tonumber(row.Default) end
 local selector = menu.selectors['player.quickslots']
 values[selector.id] = next(selector.byValue)
-local callback, unsubscribed, outcomes = nil, 0, {}
+local callbacks, unsubscribed, outcomes = {}, 0, {}
 local stop = te:subscribeApplied({subscribe = function(provider, fn)
-    check(provider == 'UE4SSTemplatingEngine'); callback = fn
+    check(provider == 'UE4SSTemplatingEngine' or provider:match('^UE4SSTemplatingEngine%.[%w_.]+$'))
+    callbacks[provider] = fn
     return function() unsubscribed = unsubscribed + 1 end
 end}, menu, function() return {playerActions = dofile('tests/support/service.lua')()} end,
 function(ok, errors) outcomes[#outcomes + 1] = {ok = ok, errors = errors} end)
+local callback = assert(callbacks.UE4SSTemplatingEngine)
+check(callbacks['UE4SSTemplatingEngine.player.quickslots'] ~= nil)
+check(callbacks['UE4SSTemplatingEngine.player.stats'] ~= nil)
 check(attaches == 0) -- Editing values locally has no runtime effect.
 callback({providerId = 'SomeoneElse', revision = 1, values = values})
 check(attaches == 0)
@@ -44,7 +48,7 @@ callback({providerId = 'UE4SSTemplatingEngine', revision = 2, values = values})
 check(detached == 1 and te.runtime:selection('player.quickslots') == nil)
 callback({providerId = 'UE4SSTemplatingEngine', revision = 3, values = {}})
 check(not outcomes[#outcomes].ok and te.runtime.revision == 2)
-stop(); stop(); check(unsubscribed == 1)
+stop(); stop(); check(unsubscribed == #menu.pages + 1)
 
 -- Exercise the actual text loader with a real file and a restricted environment.
 local path = 'work/loader-fixture.lua'

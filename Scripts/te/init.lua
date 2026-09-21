@@ -32,14 +32,32 @@ function M.new(options)
     function self:subscribeApplied(settingsApi, menu, getContext, onResult)
         assert(not self.unsubscribe, 'Apply subscription already active')
         assert(type(getContext) == 'function' and type(onResult) == 'function', 'context and result handlers required')
-        local unsubscribe = settingsApi.subscribe('UE4SSTemplatingEngine', function(event)
-            if event.providerId ~= 'UE4SSTemplatingEngine' then return end
-            local ok, applied, errors = pcall(function()
-                return runtime:commit(event, menu.decode, getContext())
+        local unsubscribers, revisions, sequence = {}, {}, 0
+        local providers = menu.providers or {UE4SSTemplatingEngine={id='UE4SSTemplatingEngine',decode=menu.decode}}
+        local ids = {}; for id in pairs(providers) do ids[#ids + 1] = id end; table.sort(ids)
+        for _, providerId in ipairs(ids) do
+            local provider = providers[providerId]
+            local unsubscribe = settingsApi.subscribe(providerId, function(event)
+                if event.providerId ~= providerId then return end
+                if event.revision <= (revisions[providerId] or 0) then return end
+                revisions[providerId] = event.revision
+                sequence = sequence + 1
+                local committed = {providerId=providerId, revision=sequence,
+                    values=event.values, changes=event.changes}
+                local ok, applied, errors = pcall(function()
+                    return runtime:commit(committed, provider.decode, getContext())
+                end)
+                if not ok then onResult(nil, applied) else onResult(applied, errors) end
             end)
-            if not ok then onResult(nil, applied) else onResult(applied, errors) end
-        end)
-        assert(type(unsubscribe) == 'function', 'Settings API must return unsubscribe')
+            assert(type(unsubscribe) == 'function', 'Settings API must return unsubscribe')
+            unsubscribers[#unsubscribers + 1] = unsubscribe
+        end
+        local active = true
+        local function unsubscribe()
+            if not active then return end
+            active = false
+            for _, stop in ipairs(unsubscribers) do stop() end
+        end
         self.unsubscribe = unsubscribe
         return function()
             if self.unsubscribe == unsubscribe then unsubscribe(); self.unsubscribe = nil end
