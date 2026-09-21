@@ -111,4 +111,24 @@ check(runtime:dispatch('player.quickslots','GroupSelected',context,{ready=true})
 check(runtime.pending['player.quickslots']==nil and calls[#calls]=='A:render:GroupSelected')
 local eventResult,eventWhy=runtime:dispatch('player.quickslots','Unknown',context,{})
 check(eventResult==nil and eventWhy:find('unsupported player.quickslots event Unknown',1,true))
+local multiCategories=Categories.new();multiCategories:registerCategory('menu',{'fixes'})
+local multiTemplates={
+    {collection='Tests',category='menu.fixes',name='First',settings={enabled=true}},
+    {collection='Tests',category='menu.fixes',name='Second',settings={enabled=true}},
+}
+local multiRegistry=Registry.new(multiCategories,{execute=function()return multiTemplates end})
+multiRegistry:registerTemplate('multi.lua');multiRegistry:loadTemplatesFromRegister()
+local firstId,secondId=multiRegistry.templates[1].id,multiRegistry.templates[2].id
+local multiRuntime=Lifecycle.new(multiRegistry)
+local desired={{id=firstId,configuration={}},{id=secondId,configuration={}}}
+check(multiRuntime:commit({revision=1,values={}},function()return {['menu.fixes']=desired}end,{}))
+local selected=multiRuntime:selection('menu.fixes')
+check(#selected==2 and multiRuntime:render('menu.fixes',{},nil,'test')=='ignored')
+check(multiRuntime:commit({revision=2,values={}},function()
+    return {['menu.fixes']={{id=secondId,configuration={}}}}
+end,{}))
+selected=multiRuntime:selection('menu.fixes')
+check(#selected==1 and selected[1].id==secondId)
+check(multiRuntime:commit({revision=3,values={}},function()return {['menu.fixes']={}}end,{}))
+check(multiRuntime:selection('menu.fixes')==nil)
 print('lifecycle: ' .. checks .. ' checks passed')
