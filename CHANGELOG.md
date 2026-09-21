@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add the `menu.controls` and `menu.templates` template categories.
 - Add the `other` category family with the `other.unknown` fallback category.
 - Store registered subcategories as `_categories[module][category]`, initialized with `visible`, `count`, and `templates`.
 - Add `setCategory(category, values)` for category metadata such as `visible`.
