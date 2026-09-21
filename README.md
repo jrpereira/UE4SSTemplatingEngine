@@ -69,4 +69,4 @@ A template file may return one template or a nested array of templates. Template
 
 Only categories with registered templates appear in the menu. A host may register additional categories before loading templates.
 
-> The current `0.1.0-menu-test` build exercises registration, validation, menu generation, persistence, and Apply callbacks. Native discovery, gameplay input, and visual cutover are still under development.
+> The current `0.0.17` menu-test build exercises registration, validation, menu generation, persistence, and Apply callbacks. Native discovery, gameplay input, and visual cutover are still under development.

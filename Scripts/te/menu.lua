@@ -56,7 +56,7 @@ function M.generate(registry, options)
         for _, name in ipairs(names) do lines[#lines + 1] = name .. '=' .. tostring(fields[name]) end
         lines[#lines + 1] = ''
     end
-    emit('Mod', {Id = 'UE4SSTemplatingEngine', Name = 'Templates', Version = '0.1.0',
+    emit('Mod', {Id = 'UE4SSTemplatingEngine', Name = 'Templates', Version = '0.0.17',
         Description = options.description and text(options.description) or nil})
     emit('Category.Templates', {DecoHeading = 0})
     local function row(fields)
