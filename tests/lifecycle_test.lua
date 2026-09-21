@@ -5,12 +5,13 @@ local Lifecycle = require('te.lifecycle')
 local checks = 0
 local function check(value) assert(value); checks = checks + 1 end
 local categories = Categories.new(); categories:registerCategory('player', {'quickslots'})
-local calls, failAttach, failDetach = {}, false, false
+local calls, failAttach, failDetach, deferAttach = {}, false, false, false
 local function template(name)
     return {collection = 'Tests', category = 'player.quickslots', name = name,
         actions = {{name = 'Group', slots = 1, type = 'any'}},
         attach = function(self, context, spec, previous)
             calls[#calls + 1] = self.name .. ':attach'
+            if deferAttach then return nil, 'not_ready' end
             if failAttach then return nil, 'attach failure' end
             local handle = previous or {original = context.original}
             handle.value = spec.value
@@ -74,4 +75,14 @@ check(#calls == before and runtime:selection('player.quickslots') == nil)
 check(not runtime:apply('player.quickslots', 'missing', {}, context))
 failAttach = true
 check(not runtime:apply('player.quickslots', a, {}, context) and runtime:selection('player.quickslots') == nil)
+failAttach = false; deferAttach = true
+local deferred, state = runtime:apply('player.quickslots', a, {value=13}, context)
+check(deferred and state == 'not_ready' and runtime.active['player.quickslots'] == nil
+    and runtime.pending['player.quickslots'] ~= nil)
+check(select(2, runtime:selection('player.quickslots')).value == 13)
+check(runtime:render('player.quickslots', context, {}, 'created') == 'ignored')
+check(select(2, runtime:retry('player.quickslots', context)) == 'not_ready')
+deferAttach = false
+check(runtime:retry('player.quickslots', context) and runtime.pending['player.quickslots'] == nil
+    and runtime.active['player.quickslots'] ~= nil)
 print('lifecycle: ' .. checks .. ' checks passed')

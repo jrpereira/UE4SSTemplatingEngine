@@ -42,7 +42,7 @@ for _, invalid in ipairs({false,'bad',{}, {valid=true}}) do
     check(not runtime:detach('player.quickslots',context,'none'))
     check(#calls==before and runtime.active['player.quickslots'].handle==handle)
 end
-for _, method in ipairs({'valid','same','identity','parent'}) do
+for _, method in ipairs({'valid','same','identity','parent','quickslotSwitcher'}) do
     local service=makeService();service[method]=nil;context.playerActions=service
     local result,why=runtime:render('player.quickslots',context,{},'event')
     check(result==nil and why:find('requires '..method,1,true))

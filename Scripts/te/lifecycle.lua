@@ -4,7 +4,7 @@ local M = {}
 
 function M.new(registry, options)
     options = options or {}
-    local self = {active = {}, revision = 0}
+    local self = {active = {}, pending = {}, revision = 0}
     local busy = false
     local function resolveService(category, context)
         local service
@@ -16,7 +16,7 @@ function M.new(registry, options)
         else error('no service resolver for category: ' .. category) end
         assert(type(service) == 'table', category .. ': category service must be a table')
         if category == 'player.quickslots' then
-            for _, method in ipairs({'valid', 'same', 'identity', 'parent'}) do
+            for _, method in ipairs({'valid', 'same', 'identity', 'parent', 'quickslotSwitcher'}) do
                 assert(type(service[method]) == 'function', 'quickslots service requires ' .. method)
             end
         end
@@ -31,6 +31,7 @@ function M.new(registry, options)
         return result, err
     end
     local function detach(category, context, reason)
+        self.pending[category] = nil
         if reason == 'world_invalidated' then
             self.active[category] = nil
             return true
@@ -47,8 +48,7 @@ function M.new(registry, options)
     function self:detach(category, context, reason)
         return guarded(function() return detach(category, context, reason or 'disable') end)
     end
-    function self:apply(category, identity, configuration, context)
-        return guarded(function()
+    local function apply(category, identity, configuration, context)
             assert(registry.categories:contains(category), 'unregistered category: ' .. tostring(category))
             if identity == nil then return detach(category, context, 'none') end
             local entry = assert(registry.byId[identity], 'unknown template identity')
@@ -67,9 +67,25 @@ function M.new(registry, options)
             local ok, handle, err = pcall(entry.template.attach, entry.template, resolveService(category, context),
                 U.copy(spec), previous and previous.handle or nil)
             if not ok then return nil, tostring(handle) end
+            if (handle == nil or handle == false) and err == 'not_ready' then
+                self.pending[category] = {id=identity, template=entry.template, configuration=spec}
+                return true, 'not_ready'
+            end
             if handle == nil or handle == false then return nil, err or 'attach returned no handle' end
+            self.pending[category] = nil
             self.active[category] = {id = identity, template = entry.template, handle = handle, configuration = spec}
             return true
+    end
+    function self:apply(category, identity, configuration, context)
+        return guarded(function()
+            return apply(category, identity, configuration, context)
+        end)
+    end
+    function self:retry(category, context)
+        return guarded(function()
+            local pending = self.pending[category]
+            if not pending then return true end
+            return apply(category, pending.id, pending.configuration, context)
         end)
     end
     function self:render(category, context, target, reason)
@@ -83,7 +99,7 @@ function M.new(registry, options)
         end)
     end
     function self:selection(category)
-        local current = self.active[category]
+        local current = self.pending[category] or self.active[category]
         if not current then return nil end
         return current.id, U.copy(current.configuration)
     end

@@ -21,10 +21,14 @@ values[selector.id] = selected
 values[definition.access], values[definition.firstDefault] = 1, 1
 values[definition.shared[1].mode], values[definition.groups['1'].mode] = 1, 2
 local service = {}
+local switcher = {id='quickslots-switcher', children={{id='wheel:1'}, {id='wheel:2'}}}
+function switcher:GetChildrenCount() return #self.children end
+function switcher:GetChildAt(index) return self.children[index + 1] end
 function service:valid(object) return object ~= nil and object.dead ~= true end
 function service:same(a, b) return rawequal(a, b) end
 function service:identity(object) return object.id end
 function service:parent(object) return object.parent end
+function service:quickslotSwitcher() return switcher end
 local context = {playerActions = service}
 check(te.runtime:commit({revision = 1, values = values}, menu.decode, context))
 check(entry.template.widgetRenderingEnabled == false)
@@ -33,6 +37,8 @@ check(te.runtime:render('player.quickslots', context, {kind='swap_prompt'}, 'cre
 entry.template.widgetRenderingEnabled = true
 local handle = te.runtime.active['player.quickslots'].handle
 check(handle.provider.WheelsDisplayed == 2 and handle.provider.PrimaryWheel == 0)
+check(handle.switcher == switcher and handle.slots[1] == switcher.children[1]
+    and handle.slots[2] == switcher.children[2])
 values[definition.provider.PrimaryX] = 37
 check(te.runtime:commit({revision = 2, values = values}, menu.decode, context))
 check(te.runtime.active['player.quickslots'].handle == handle and handle.provider.PrimaryX == 37)

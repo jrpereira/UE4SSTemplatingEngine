@@ -104,6 +104,25 @@ function M.start(root, settings, queue, log)
         local parent = object:GetParent()
         return self:valid(parent) and parent or nil
     end
+    function service:quickslotSwitcher()
+        if type(FindAllOf) ~= 'function' then return nil end
+        local ok, objects = pcall(FindAllOf, 'WBP_GameHUD_C')
+        if not ok or type(objects) ~= 'table' then return nil end
+        for _, hud in ipairs(objects) do
+            if self:valid(hud) then
+                local named, fullName = pcall(function() return hud:GetFullName() end)
+                if named and tostring(fullName):find('/Engine/Transient', 1, true) then
+                    local found, switcher = pcall(function() return hud.QuickslotsSwitcher end)
+                    if found and switcher ~= nil then
+                        local unwrapped, value = pcall(function() return switcher:get() end)
+                        if unwrapped then switcher = value end
+                        if self:valid(switcher) then return switcher end
+                    end
+                end
+            end
+        end
+        return nil
+    end
     local routed = {subscribe=function(provider, callback)
         return settings.subscribe(provider, function(event) queue(function() callback(event) end) end)
     end}

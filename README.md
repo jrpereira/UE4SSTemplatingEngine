@@ -64,6 +64,8 @@ A template file may return one template or a nested array of templates. Template
 
 `attach` is called on activation and again when settings are applied. It should be idempotent and preserve the original game state. `render` responds to relevant discovered widgets or events. `detach` runs while objects are still valid and must restore owned changes. When the world is already invalid, TE forgets the active handle without calling template code.
 
+The `player.quickslots` service exposes `quickslotSwitcher()`, which returns the live `QuickslotsSwitcher` or `nil` while the HUD is unavailable. A quickslots template discovers and validates the switcher and its immediate children in `attach`, then keeps those objects on its handle. It must return `nil, "not_ready"` before mutation when the HUD is unavailable. TE records that selection as pending; the category's HUD/onload hook calls `runtime:retry("player.quickslots", context)` when native widgets become available. `render` never performs or retries this discovery.
+
 ## Built-in categories
 
 - `player.quickslots`, `player.stats`, `player.charges`, `player.self`, `player.compass`, `player.notifications`, `player.wheel`
