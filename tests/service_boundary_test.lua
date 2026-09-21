@@ -9,8 +9,9 @@ local expected=a
 local function template(name)
     return {collection='Boundary',name=name,category='player.quickslots',
         actions={{name='Group',slots=1,type='ability'}},
-        attach=function(self,service,spec,previous)
+        attach=function(self,service,target,spec,previous)
             check(service==expected and service.playerActions==nil)
+            check(target~=nil)
             calls[#calls+1]='attach:'..name
             return previous or {}
         end,
@@ -29,7 +30,7 @@ local registry=R.new(categories,{execute=function() return {template('A'),templa
 registry:registerTemplate('boundary.lua');registry:loadTemplatesFromRegister()
 local first,second=registry.templates[1].id,registry.templates[2].id
 local runtime=L.new(registry)
-local context={playerActions=a,hostOnly=true}
+local context={playerActions=a,hostOnly=true,targets={['player.quickslots']={}}}
 check(not runtime:apply('player.quickslots',first,{},{}))
 check(#calls==0 and runtime:selection('player.quickslots')==nil)
 check(runtime:apply('player.quickslots',first,{},context))
@@ -42,7 +43,7 @@ for _, invalid in ipairs({false,'bad',{}, {valid=true}}) do
     check(not runtime:detach('player.quickslots',context,'none'))
     check(#calls==before and runtime.active['player.quickslots'].handle==handle)
 end
-for _, method in ipairs({'valid','same','identity','parent','quickslotSwitcher'}) do
+for _, method in ipairs({'valid','same','identity','parent'}) do
     local service=makeService();service[method]=nil;context.playerActions=service
     local result,why=runtime:render('player.quickslots',context,{},'event')
     check(result==nil and why:find('requires '..method,1,true))
@@ -65,9 +66,10 @@ local overridden=L.new(registry,{resolveService=function(category, supplied)
     return a
 end})
 expected=a
-check(overridden:apply('player.quickslots',first,{}, {token='host'}))
-check(overridden:detach('player.quickslots',{token='host'},'none'))
-check(overridden:apply('player.quickslots',first,{}, {token='host'}))
+local hostContext={token='host',targets={['player.quickslots']={}}}
+check(overridden:apply('player.quickslots',first,{},hostContext))
+check(overridden:detach('player.quickslots',hostContext,'none'))
+check(overridden:apply('player.quickslots',first,{},hostContext))
 before=#calls
 check(overridden:detach('player.quickslots',nil,'world_invalidated'))
 check(#calls==before and overridden:selection('player.quickslots')==nil)

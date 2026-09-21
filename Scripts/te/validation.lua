@@ -1,5 +1,6 @@
 local U = require('te.util')
 local Provider = require('te.provider_settings')
+local Events = require('te.event_contracts')
 local M = {}
 
 function M.actions(actions, where)
@@ -27,7 +28,9 @@ function M.template(template, categories, where, runtime)
     U.text(template.category, where .. '.category')
     assert(categories:contains(template.category), where .. ': unregistered category ' .. template.category)
     U.text(template.name, where .. '.name')
-    Provider.normalize(template.providerSettings)
+    assert(template.providerSettings == nil, where .. '.providerSettings: renamed to settings')
+    Provider.normalize(template.settings)
+    Events.validate(template.category, template.events, where)
     if template.category == 'player.quickslots' then
         M.actions(template.actions, where .. '.actions')
         if template.actionOrder ~= nil then M.orderedGroups(template) end

@@ -2,7 +2,12 @@
 
 ## Unreleased
 
-- Add `quickslotSwitcher()` to the quickslots service and defer `attach` cleanly when the HUD is not ready.
+- Validate category event interests and route declared events through service-first template callbacks.
+- Retry pending attachments when a declared category event arrives.
+- Validate committed provider settings before template attachment.
+- Name template declarations `settings` and deliver committed values as `configuration.settings` while preserving persisted setting identities.
+- Add `te.widget` helpers for safe UE property reads, transforms, opacity, and slot snapshots.
+- Resolve category targets in TE and pass them to `attach`, removing target discovery from template services.
 - Split template selection into an aggregate `Templates` DMM page and generated category pages that own each template's detailed controls.
 - Add the DMM startup extension that injects generated category pages while keeping their settings rooted in TE's shared `config.ini`.
 - Add the `menu.controls` and `menu.templates` template categories.

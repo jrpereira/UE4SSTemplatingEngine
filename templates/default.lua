@@ -16,7 +16,7 @@ local template = {
     },
 }
 
-function template:attach(service, settings, previous)
+function template:attach(service, target, settings, previous)
     return previous or {}
 end
 

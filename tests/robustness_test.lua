@@ -15,8 +15,8 @@ local registry = R.new(categories, {execute = function() return template end})
 registry:registerTemplate('fixture.lua'); registry:loadTemplatesFromRegister()
 local identity = registry.templates[1].id
 local runtime = L.new(registry)
-local context = {playerActions = dofile('tests/support/service.lua')()}
-function template:attach(_, _, previous) return previous or {} end
+local context = {playerActions = dofile('tests/support/service.lua')(),targets={['player.quickslots']={}}}
+function template:attach(_, _, _, previous) return previous or {} end
 function template:detach() return true end
 function template:render() return 'applied' end
 check(runtime:apply('player.quickslots', identity, {}, context))
@@ -33,7 +33,7 @@ template.render = function() error('native render exception') end
 check(not runtime:render('player.quickslots', context, {}, 'event'))
 template.render = function() return 'invalid-status' end
 check(not runtime:render('player.quickslots', context, {}, 'event'))
-template.attach = function(_, _, _, previous)
+template.attach = function(_, _, _, _, previous)
     local applied, why = runtime:commit({revision = 99, values = {}}, function() return {} end, {})
     check(not applied and why == 'reentrant lifecycle operation')
     local nested, nestedWhy = runtime:detach('player.quickslots', {}, 'none')

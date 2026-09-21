@@ -12,6 +12,7 @@ local template = {
     name = "My Quickslots",
     category = "player.quickslots",
     contexts = { "combat", "openworld" },
+    events = { "GroupSelected", "SlotActivated" },
 
     actions = {
         { name = "Abilities",   slots = 4, type = "ability" },
@@ -19,7 +20,7 @@ local template = {
     },
 }
 
-function template:attach(service, settings, previous)
+function template:attach(service, target, settings, previous)
     -- Prepare the replacement and return an opaque state handle.
     -- Reusing `previous` makes repeated Apply operations idempotent.
     return previous or { original = {} }
@@ -60,11 +61,15 @@ Each template needs:
 
 Categories may require extra data. `player.quickslots`, for example, requires an ordered `actions` array. Each action group declares its display name, slot count, and semantic type. TE uses that information to generate direct-slot or group-first key bindings without hard-coding a particular quickslot layout.
 
+Templates declare the category events they consume with `events`. TE validates those names against the category contract, subscribes once through its event host, and delivers only declared events. The callback remains `render(service, handle, payload, eventName)`. If the selected template is waiting for native objects, a declared event retries `attach` before delivery. QSF currently declares `GroupSelected` and `SlotActivated`; it does not register those native hooks itself.
+
 A template file may return one template or a nested array of templates. Template files are ordinary Lua and can access the environment in which the host loads them, so install templates only from sources you trust.
 
 `attach` is called on activation and again when settings are applied. It should be idempotent and preserve the original game state. `render` responds to relevant discovered widgets or events. `detach` runs while objects are still valid and must restore owned changes. When the world is already invalid, TE forgets the active handle without calling template code.
 
-The `player.quickslots` service exposes `quickslotSwitcher()`, which returns the live `QuickslotsSwitcher` or `nil` while the HUD is unavailable. A quickslots template discovers and validates the switcher and its immediate children in `attach`, then keeps those objects on its handle. It must return `nil, "not_ready"` before mutation when the HUD is unavailable. TE records that selection as pending; the category's HUD/onload hook calls `runtime:retry("player.quickslots", context)` when native widgets become available. `render` never performs or retries this discovery.
+The `player.quickslots` service exposes `valid`, `same`, `identity`, and `parent`. A quickslots template calls these methods directly. TE resolves the current QuickslotsSwitcher and invokes `attach(service, target, configuration, previousHandle)` only when that target is valid. If it is unavailable, TE keeps the selection pending without calling template code. A declared category event retries the attachment with its resolved target, then invokes `render(service, handle, target, eventName)`. Handles retain provider-owned mutation and restoration state; templates do not rediscover or retain the category parent merely for later rendering.
+
+Templates may declare menu controls in `settings = { groups = {...}, fields = {...} }`. TE validates the committed `configuration.settings` values against that declaration before invoking `attach`. Persisted setting identities retain their existing values when adopting this name. Templates can import `require("te.widget")` for generic UE widget operations: `unwrap`, `property`, `number`, `translation`, `scale`, `opacity`, `setTranslation`, `setScale`, `setOpacity`, `snapshotSlot`, and `restoreSlot`. Layout policy, widget ownership, restoration journals, and category behavior stay in the template.
 
 ## Built-in categories
 

@@ -65,8 +65,30 @@ end
 function M.start(root, settings, queue, log)
     local profile = assert(loadfile(root .. '/menu-profile.lua', 't', {}))()
     assert(profile.mode == 'menu-test', 'unsupported installed profile')
+    local service
     local te = TE.new({categoriesPath=root..'/categories.lua',templatesFolder=root..'/templates',
-        listFiles=function() return {} end})
+        listFiles=function() return {} end,
+        resolveTarget=function(category, context)
+            if type(context)=='table' and type(context.targets)=='table' and context.targets[category]~=nil then
+                return context.targets[category]
+            end
+            if category~='player.quickslots' or type(FindAllOf)~='function' then return nil end
+            local ok,objects=pcall(FindAllOf,'WBP_GameHUD_C')
+            if not ok or type(objects)~='table' then return nil end
+            for _,hud in ipairs(objects) do
+                if service:valid(hud) then
+                    local named,fullName=pcall(function() return hud:GetFullName() end)
+                    if named and tostring(fullName):find('/Engine/Transient',1,true) then
+                        local found,switcher=pcall(function() return hud.QuickslotsSwitcher end)
+                        if found and switcher~=nil then
+                            local unwrapped,value=pcall(function() return switcher:get() end)
+                            if unwrapped then switcher=value end
+                            if service:valid(switcher) then return switcher end
+                        end
+                    end
+                end
+            end
+        end})
     for _, path in ipairs(profile.templates) do te:registerTemplate(root .. '/' .. path) end
     te:loadTemplatesFromRegister()
     for _, entry in ipairs(te.registry.templates) do
@@ -86,7 +108,7 @@ function M.start(root, settings, queue, log)
             'category page changed; rebuild TE menu before restart')
     end
     if ensureConfig(root .. '/config.ini', menu.rows) then log('Added defaults for new template settings.') end
-    local service = {}
+    service = {}
     function service:valid(object)
         if object == nil then return false end
         local ok, value = pcall(function() return object:IsValid() end)
@@ -103,25 +125,6 @@ function M.start(root, settings, queue, log)
         if not self:valid(object) then return nil end
         local parent = object:GetParent()
         return self:valid(parent) and parent or nil
-    end
-    function service:quickslotSwitcher()
-        if type(FindAllOf) ~= 'function' then return nil end
-        local ok, objects = pcall(FindAllOf, 'WBP_GameHUD_C')
-        if not ok or type(objects) ~= 'table' then return nil end
-        for _, hud in ipairs(objects) do
-            if self:valid(hud) then
-                local named, fullName = pcall(function() return hud:GetFullName() end)
-                if named and tostring(fullName):find('/Engine/Transient', 1, true) then
-                    local found, switcher = pcall(function() return hud.QuickslotsSwitcher end)
-                    if found and switcher ~= nil then
-                        local unwrapped, value = pcall(function() return switcher:get() end)
-                        if unwrapped then switcher = value end
-                        if self:valid(switcher) then return switcher end
-                    end
-                end
-            end
-        end
-        return nil
     end
     local routed = {subscribe=function(provider, callback)
         return settings.subscribe(provider, function(event) queue(function() callback(event) end) end)

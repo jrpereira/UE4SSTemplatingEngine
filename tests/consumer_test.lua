@@ -28,23 +28,21 @@ function service:valid(object) return object ~= nil and object.dead ~= true end
 function service:same(a, b) return rawequal(a, b) end
 function service:identity(object) return object.id end
 function service:parent(object) return object.parent end
-function service:quickslotSwitcher() return switcher end
-local context = {playerActions = service}
+local context = {playerActions = service,targets={['player.quickslots']=switcher}}
 check(te.runtime:commit({revision = 1, values = values}, menu.decode, context))
 check(entry.template.widgetRenderingEnabled == false)
 check(te.runtime:render('player.quickslots', context, {kind='swap_prompt'}, 'created') == 'ignored')
 -- Exercise visual implementation only on this in-memory test instance.
 entry.template.widgetRenderingEnabled = true
 local handle = te.runtime.active['player.quickslots'].handle
-check(handle.provider.WheelsDisplayed == 2 and handle.provider.PrimaryWheel == 0)
-check(handle.switcher == switcher and handle.slots[1] == switcher.children[1]
-    and handle.slots[2] == switcher.children[2])
-values[definition.provider.PrimaryX] = 37
+check(handle.settings.WheelsDisplayed == 2 and handle.settings.PrimaryWheel == 0)
+check(handle.switcher == nil and handle.slots == nil)
+values[definition.settings.PrimaryX] = 37
 check(te.runtime:commit({revision = 2, values = values}, menu.decode, context))
-check(te.runtime.active['player.quickslots'].handle == handle and handle.provider.PrimaryX == 37)
+check(te.runtime.active['player.quickslots'].handle == handle and handle.settings.PrimaryX == 37)
 local _, committed = te.runtime:selection('player.quickslots')
 check(committed.groups['1'].mode == 2 and committed.groups['2'].mode == 0 and committed.shared[1].mode == 1)
-check(handle.provider ~= committed.provider)
+check(handle.settings ~= committed.settings)
 for _, kind in ipairs({'wheel_layout', 'hud_indicators', 'ability_radial_indicators', 'swap_prompt'}) do
     check(te.runtime:render('player.quickslots', context, {kind=kind}, 'created') == 'not_ready')
 end

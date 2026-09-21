@@ -12,7 +12,7 @@ function M.new(options)
     local core = options.coreCategories or assert(loadfile(options.categoriesPath or 'categories.lua', 't'))()
     core(function(...) categories:registerCategory(...) end)
     local registry = Registry.new(categories, options)
-    local runtime = Lifecycle.new(registry, {resolveService = options.resolveService})
+    local runtime = Lifecycle.new(registry, {resolveService=options.resolveService,resolveTarget=options.resolveTarget})
     local self = {registry = registry, categories = categories, runtime = runtime}
     function self:registerCategory(...) return categories:registerCategory(...) end
     function self:setCategory(...) return categories:setCategory(...) end
@@ -61,6 +61,44 @@ function M.new(options)
         self.unsubscribe = unsubscribe
         return function()
             if self.unsubscribe == unsubscribe then unsubscribe(); self.unsubscribe = nil end
+        end
+    end
+    function self:subscribeEvents(eventHost, getContext, onResult)
+        assert(not self.unsubscribeEvents, 'Event subscription already active')
+        assert(type(eventHost) == 'table' and type(eventHost.subscribe) == 'function',
+            'event host subscription adapter required')
+        assert(type(getContext) == 'function' and type(onResult) == 'function',
+            'event context and result handlers required')
+        local requested = {}
+        for _, entry in ipairs(registry.templates) do
+            local category = entry.template.category
+            for _, event in ipairs(entry.template.events or {}) do
+                requested[category .. '\0' .. event] = {category=category,event=event}
+            end
+        end
+        local keys = {}; for identity in pairs(requested) do keys[#keys+1]=identity end; table.sort(keys)
+        local unsubscribers = {}
+        for _, identity in ipairs(keys) do
+            local interest = requested[identity]
+            local unsubscribe = eventHost.subscribe(interest.category, interest.event, function(payload)
+                local ok, status, detail = pcall(function()
+                    return runtime:dispatch(interest.category, interest.event, getContext(), payload)
+                end)
+                if not ok then onResult(nil, status, interest.category, interest.event)
+                else onResult(status, detail, interest.category, interest.event) end
+            end)
+            assert(type(unsubscribe) == 'function', 'Event host must return unsubscribe')
+            unsubscribers[#unsubscribers+1] = unsubscribe
+        end
+        local active = true
+        local function unsubscribe()
+            if not active then return end
+            active = false
+            for _, stop in ipairs(unsubscribers) do stop() end
+        end
+        self.unsubscribeEvents = unsubscribe
+        return function()
+            if self.unsubscribeEvents == unsubscribe then unsubscribe(); self.unsubscribeEvents=nil end
         end
     end
     self:registerTemplates(options.templatesFolder or 'templates')

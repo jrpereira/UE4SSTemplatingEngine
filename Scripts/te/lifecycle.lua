@@ -1,5 +1,7 @@
 local U = require('te.util')
 local V = require('te.validation')
+local Provider = require('te.provider_settings')
+local Events = require('te.event_contracts')
 local M = {}
 
 function M.new(registry, options)
@@ -16,11 +18,19 @@ function M.new(registry, options)
         else error('no service resolver for category: ' .. category) end
         assert(type(service) == 'table', category .. ': category service must be a table')
         if category == 'player.quickslots' then
-            for _, method in ipairs({'valid', 'same', 'identity', 'parent', 'quickslotSwitcher'}) do
+            for _, method in ipairs({'valid', 'same', 'identity', 'parent'}) do
                 assert(type(service[method]) == 'function', 'quickslots service requires ' .. method)
             end
         end
         return service
+    end
+    local function resolveTarget(category, context, supplied)
+        local target = supplied
+        if target == nil and options.resolveTarget then target = options.resolveTarget(category, context) end
+        if target == nil and type(context) == 'table' and type(context.targets) == 'table' then
+            target = context.targets[category]
+        end
+        return target
     end
     local function guarded(operation)
         if busy then return nil, 'reentrant lifecycle operation' end
@@ -48,7 +58,7 @@ function M.new(registry, options)
     function self:detach(category, context, reason)
         return guarded(function() return detach(category, context, reason or 'disable') end)
     end
-    local function apply(category, identity, configuration, context)
+    local function apply(category, identity, configuration, context, suppliedTarget)
             assert(registry.categories:contains(category), 'unregistered category: ' .. tostring(category))
             if identity == nil then return detach(category, context, 'none') end
             local entry = assert(registry.byId[identity], 'unknown template identity')
@@ -56,15 +66,21 @@ function M.new(registry, options)
             V.template(entry.template, registry.categories, entry.location, true)
             assert(type(configuration) == 'table', 'committed configuration must be a table')
             local spec = U.copy(configuration)
+            Provider.validate(entry.template.settings, spec.settings)
             -- Validate before releasing an old attachment, then resolve freshly for each call.
-            resolveService(category, context)
+            local service = resolveService(category, context)
+            local target = resolveTarget(category, context, suppliedTarget)
+            if Events.requiresTarget(category) and not service:valid(target) then
+                self.pending[category] = {id=identity, template=entry.template, configuration=spec}
+                return true, 'not_ready'
+            end
             local previous = self.active[category]
             if previous and previous.id ~= identity then
                 local ok, err = detach(category, context, 'switch')
                 if not ok then return nil, err end
                 previous = nil
             end
-            local ok, handle, err = pcall(entry.template.attach, entry.template, resolveService(category, context),
+            local ok, handle, err = pcall(entry.template.attach, entry.template, service, target,
                 U.copy(spec), previous and previous.handle or nil)
             if not ok then return nil, tostring(handle) end
             if (handle == nil or handle == false) and err == 'not_ready' then
@@ -93,6 +109,24 @@ function M.new(registry, options)
             local current = self.active[category]
             if not current then return 'ignored' end
             local status, err = current.template:render(resolveService(category, context), current.handle, target, reason)
+            assert(status == 'applied' or status == 'not_ready' or status == 'ignored',
+                'invalid render status: ' .. tostring(status))
+            return status, err
+        end)
+    end
+    function self:dispatch(category, event, context, payload)
+        return guarded(function()
+            assert(Events.supports(category, event), 'unsupported ' .. tostring(category) .. ' event ' .. tostring(event))
+            local desired = self.pending[category] or self.active[category]
+            if not desired or not Events.interested(desired.template, event) then return 'ignored' end
+            if self.pending[category] then
+                local attached, why = apply(category, desired.id, desired.configuration, context, payload)
+                if not attached then return nil, why end
+                if why == 'not_ready' then return 'not_ready' end
+            end
+            local current = self.active[category]
+            if not current then return 'ignored' end
+            local status, err = current.template:render(resolveService(category, context), current.handle, payload, event)
             assert(status == 'applied' or status == 'not_ready' or status == 'ignored',
                 'invalid render status: ' .. tostring(status))
             return status, err

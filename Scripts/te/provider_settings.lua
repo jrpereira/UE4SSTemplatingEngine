@@ -29,10 +29,10 @@ end
 
 function M.normalize(declaration)
     if declaration == nil then return {} end
-    assert(type(declaration) == 'table', 'providerSettings must be a table')
-    allowed(declaration, {groups=true,fields=true}, 'providerSettings')
-    U.array(declaration.groups, 'providerSettings.groups')
-    U.array(declaration.fields, 'providerSettings.fields')
+    assert(type(declaration) == 'table', 'settings must be a table')
+    allowed(declaration, {groups=true,fields=true}, 'settings')
+    U.array(declaration.groups, 'settings.groups')
+    U.array(declaration.fields, 'settings.fields')
     local groups, byId, fields = {}, {}, {}
     for index, source in ipairs(declaration.groups) do
         assert(type(source) == 'table', 'provider group must be a table')
@@ -87,6 +87,34 @@ function M.normalize(declaration)
         table.sort(group.fields, sort)
     end
     return groups
+end
+
+function M.validate(declaration, committed)
+    if declaration == nil then
+        assert(committed == nil, 'template does not declare settings')
+        return nil
+    end
+    assert(type(committed) == 'table', 'committed settings are required')
+    local expected = {}
+    for _, group in ipairs(M.normalize(declaration)) do
+        for _, field in ipairs(group.fields) do
+            expected[field.id] = true
+            local value = committed[field.id]
+            assert(finite(value), 'missing/invalid provider setting ' .. field.id)
+            if field.type == 'integer' then
+                assert(value % 1 == 0 and value >= field.min and value <= field.max,
+                    'provider setting outside range ' .. field.id)
+            else
+                local found = false
+                for _, candidate in ipairs(field.values) do if value == candidate then found = true end end
+                assert(found, 'invalid provider choice ' .. field.id)
+            end
+        end
+    end
+    for name in pairs(committed) do
+        assert(expected[name], 'unknown provider setting ' .. tostring(name))
+    end
+    return committed
 end
 
 return M

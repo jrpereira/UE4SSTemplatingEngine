@@ -184,9 +184,9 @@ function M.generate(registry, options)
                 else
                     warnings[#warnings + 1] = category .. ': no category-specific renderer defined'
                 end
-                if template.providerSettings then
-                    definition.provider = {}
-                    for _, providerGroup in ipairs(Provider.normalize(template.providerSettings)) do
+                if template.settings then
+                    definition.settings = {}
+                    for _, providerGroup in ipairs(Provider.normalize(template.settings)) do
                         local groupId = group(key({identity, 'provider', providerGroup.id}), providerGroup.label,
                             selector, value, selector, value, providerGroup.level)
                         for _, field in ipairs(providerGroup.fields) do
@@ -202,7 +202,7 @@ function M.generate(registry, options)
                                 metadata.Suffix = field.suffix
                             end
                             row(metadata)
-                            definition.provider[field.id] = settingId
+                            definition.settings[field.id] = settingId
                         end
                     end
                 end
@@ -266,9 +266,9 @@ function M.generate(registry, options)
             if definition then
                 selection.id = definition.id
                 local config = selection.configuration
-                if definition.provider then
-                    config.provider = {}
-                    for field, settingId in pairs(definition.provider) do config.provider[field] = effective[settingId] end
+                if definition.settings then
+                    config.settings = {}
+                    for field, settingId in pairs(definition.settings) do config.settings[field] = effective[settingId] end
                 end
                 if definition.access then
                     config.access = effective[definition.access]

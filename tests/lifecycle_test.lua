@@ -8,8 +8,10 @@ local categories = Categories.new(); categories:registerCategory('player', {'qui
 local calls, failAttach, failDetach, deferAttach = {}, false, false, false
 local function template(name)
     return {collection = 'Tests', category = 'player.quickslots', name = name,
+        events = name == 'A' and {'GroupSelected'} or {'SlotActivated'},
         actions = {{name = 'Group', slots = 1, type = 'any'}},
-        attach = function(self, context, spec, previous)
+        attach = function(self, context, target, spec, previous)
+            check(target ~= nil)
             calls[#calls + 1] = self.name .. ':attach'
             if deferAttach then return nil, 'not_ready' end
             if failAttach then return nil, 'attach failure' end
@@ -33,7 +35,9 @@ local registry = Registry.new(categories, {execute = function() return {template
 registry:registerTemplate('test.lua'); registry:loadTemplatesFromRegister()
 local a, b = registry.templates[1].id, registry.templates[2].id
 local runtime = Lifecycle.new(registry)
-local context = {playerActions = dofile('tests/support/service.lua')({original = 123})}
+local target = {}
+local context = {playerActions = dofile('tests/support/service.lua')({original = 123}),
+    target=target,targets={['player.quickslots']=target}}
 check(runtime:render('player.quickslots', context, {}, 'created') == 'ignored')
 local spec = {value = 7}
 check(runtime:apply('player.quickslots', a, spec, context))
@@ -85,4 +89,17 @@ check(select(2, runtime:retry('player.quickslots', context)) == 'not_ready')
 deferAttach = false
 check(runtime:retry('player.quickslots', context) and runtime.pending['player.quickslots'] == nil
     and runtime.active['player.quickslots'] ~= nil)
+check(runtime:dispatch('player.quickslots','SlotActivated',context,{ready=true})=='ignored')
+check(runtime:dispatch('player.quickslots','GroupSelected',context,{ready=true})=='applied')
+check(calls[#calls]=='A:render:GroupSelected')
+deferAttach=true
+check(runtime:detach('player.quickslots',context,'switch'))
+check(select(2,runtime:apply('player.quickslots',a,{value=14},context))=='not_ready')
+check(runtime:dispatch('player.quickslots','SlotActivated',context,{ready=true})=='ignored')
+check(runtime.pending['player.quickslots']~=nil)
+deferAttach=false
+check(runtime:dispatch('player.quickslots','GroupSelected',context,{ready=true})=='applied')
+check(runtime.pending['player.quickslots']==nil and calls[#calls]=='A:render:GroupSelected')
+local eventResult,eventWhy=runtime:dispatch('player.quickslots','Unknown',context,{})
+check(eventResult==nil and eventWhy:find('unsupported player.quickslots event Unknown',1,true))
 print('lifecycle: ' .. checks .. ' checks passed')

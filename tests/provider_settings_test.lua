@@ -30,9 +30,10 @@ for _, role in ipairs({'Primary','Secondary'}) do
     end
 end
 local template={collection='Provider test',name='Visuals',category='player.quickslots',
-    actions={{name='Actions',slots=1,type='any'}},providerSettings=declaration}
+    actions={{name='Actions',slots=1,type='any'}},settings=declaration}
 local attaches=0
-function template:attach(_,spec,previous)
+function template:attach(_,target,spec,previous)
+    check(target~=nil)
     attaches=attaches+1
     return previous or {}
 end
@@ -49,7 +50,7 @@ local model=Choices.open({id='provider-test',choices=items,testOnly=true}); asse
 local index={}; for i,item in ipairs(items) do index[item.id]=i end
 local selector=menu.selectors['player.quickslots']; local value=next(selector.byValue)
 local def=menu.definitions['player.quickslots'][value]
-local provider=def.provider
+local provider=def.settings
 check(index[provider.WheelsDisplayed]>index[def.shared[1].mode])
 check(index[provider.WheelsDisplayed]<index[provider.PrimaryWheel])
 check(index[provider.PrimaryOpacity]<index[provider.SecondaryX])
@@ -61,25 +62,29 @@ local visibility=model:visibility()
 for _, settingId in pairs(provider) do check(visibility[index[settingId]]) end
 local values={}; for i,item in ipairs(items) do values[item.id]=model.pending[i] end
 local spec=menu.decode(values)['player.quickslots'].configuration
-check(spec.provider.WheelsDisplayed==1 and spec.provider.PrimaryWheel==0)
-for id, expected in pairs(defaults) do check(spec.provider[id]==expected) end
-spec.provider.SecondaryX=900
-check(menu.decode(values)['player.quickslots'].configuration.provider.SecondaryX==40)
-local context={playerActions=dofile('tests/support/service.lua')()}
+check(spec.settings.WheelsDisplayed==1 and spec.settings.PrimaryWheel==0)
+for id, expected in pairs(defaults) do check(spec.settings[id]==expected) end
+spec.settings.SecondaryX=900
+check(menu.decode(values)['player.quickslots'].configuration.settings.SecondaryX==40)
+local context={playerActions=dofile('tests/support/service.lua')(),targets={['player.quickslots']={}}}
+local invalidSpec=U.copy(spec);invalidSpec.settings.PrimaryX=1001
+check(not te.runtime:apply('player.quickslots',menu.definitions['player.quickslots'][value].id,invalidSpec,context))
+invalidSpec=U.copy(spec);invalidSpec.settings.Unexpected=1
+check(not te.runtime:apply('player.quickslots',menu.definitions['player.quickslots'][value].id,invalidSpec,context))
 check(te.runtime:commit({revision=1,values=values},menu.decode,context))
 local handle=te.runtime.active['player.quickslots'].handle
 values[provider.SecondaryX]=75
 check(te.runtime:commit({revision=2,values=values},menu.decode,context))
 check(attaches==2 and te.runtime.active['player.quickslots'].handle==handle)
 local _, committed=te.runtime:selection('player.quickslots')
-check(committed.provider.SecondaryX==75)
+check(committed.settings.SecondaryX==75)
 check(committed.shared[1].key==spec.shared[1].key and committed.access==spec.access)
 values[provider.PrimarySize]=201
 rejects(function() menu.decode(values) end,'invalid integer')
 local saved=menu.catalog
 declaration.fields[1].order=3
 local changed=te:generateMenu({catalog=saved})
-check(changed.definitions['player.quickslots'][value].provider.WheelsDisplayed==provider.WheelsDisplayed)
+check(changed.definitions['player.quickslots'][value].settings.WheelsDisplayed==provider.WheelsDisplayed)
 local function invalid(change, message)
     local bad=U.copy(declaration); change(bad)
     rejects(function() P.normalize(bad) end,message)

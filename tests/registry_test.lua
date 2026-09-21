@@ -58,6 +58,9 @@ check(quickslots.templates[1] == registry.templates[1].template
     and quickslots.templates[2] == registry.templates[2].template)
 check(U.identity(template()) ~= U.identity(template('Second')))
 rejects(function() V.flatten({category = 'player.quickslots'}, categories, 'bad.lua') end, 'bad.lua.collection')
+rejects(function() V.flatten({collection='Tests',category='player.quickslots',name='Bad',
+    actions={{name='Group',slots=1,type='any'}},events={'Unknown'}},categories,'bad.lua') end,
+    'unsupported player.quickslots event Unknown')
 local invalid = template(); invalid.category = 'npc.actions'
 rejects(function() V.flatten(invalid, categories, 'bad.lua') end, 'unregistered category')
 invalid = template(); invalid.actions = nil
