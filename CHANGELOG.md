@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add the `other` category family with the `other.unknown` fallback category.
+
 ## 0.0.17
 
 - Register individual template files or folders containing Lua templates.

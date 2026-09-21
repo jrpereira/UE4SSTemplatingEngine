@@ -2,4 +2,5 @@
 return function(registerCategory)
     registerCategory('player', {'quickslots', 'stats', 'charges', 'self', 'compass', 'notifications', 'wheel'})
     registerCategory('npc', {'intent', 'level', 'melee', 'pawn'})
+    registerCategory('other', {'unknown'})
 end

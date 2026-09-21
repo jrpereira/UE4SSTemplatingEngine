@@ -66,6 +66,7 @@ A template file may return one template or a nested array of templates. Template
 
 - `player.quickslots`, `player.stats`, `player.charges`, `player.self`, `player.compass`, `player.notifications`, `player.wheel`
 - `npc.intent`, `npc.level`, `npc.melee`, `npc.pawn`
+- `other.unknown`
 
 Only categories with registered templates appear in the menu. A host may register additional categories before loading templates.
 
