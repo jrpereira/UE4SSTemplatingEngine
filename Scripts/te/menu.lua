@@ -62,7 +62,7 @@ function M.generate(registry, options)
     end
     emit('Mod', {Id = 'UE4SSTemplatingEngine', Name = 'Templates', Version = '0.0.17',
         Description = options.description and text(options.description) or nil})
-    emit('Category.Templates', {DecoHeading = 0})
+    emit('Category.Templates', {ammHeading = 0})
     local function row(fields)
         assert(#rows < 256, 'generated menu exceeds DMM limit of 256 settings')
         fields.ConfigFile, fields.ConfigSection, fields.ConfigKey = 'config.ini', 'Templates', fields.Id
@@ -76,16 +76,16 @@ function M.generate(registry, options)
     local function picker(settingId, label, group, values, labels, source, visible, compact, level)
         return row({Id = settingId, Label = text(label), Group = group, Type = 'picker',
             PresetValues = table.concat(values, '|'), PresetLabels = table.concat(labels, '|'), Default = values[1],
-            VisibleWhen = source, VisibleValues = visible, DecoLevel = level,
-            DecoType = compact and #values <= 8 and 'tab' or nil})
+            VisibleWhen = source, VisibleValues = visible, ammLevel = level,
+            ammType = compact and #values <= 8 and 'tab' or nil})
     end
     local function group(identity, label, selector, selected, source, visible, level, heading)
         local groupId = id({'group', identity})
         if not groups[groupId] then
             groups[groupId] = true
             local fields = {VisibleWhen = source, VisibleValues = visible,
-                DecoLevel = level or 3, DecoHeading = heading, DecoLabelWhen = selector,
-                DecoLabels = tostring(selected) .. ':' .. text(label)}
+                ammLevel = level or 3, ammHeading = heading, ammLabelWhen = selector,
+                ammLabels = tostring(selected) .. ':' .. text(label)}
             groupSections[groupId] = fields
             groupOrder[#groupOrder + 1] = groupId
             emit('Category.' .. groupId, fields)
@@ -96,11 +96,11 @@ function M.generate(registry, options)
         local settingId = id({'binding', identity})
         local modeId = settingId .. 'Mode'
         row({Id = settingId, Type = 'integer', Label = text(label), Group = groupId,
-            Minimum = 0, Maximum = 254, Step = 1, Default = 0, DecoType = 'keybind', Pair = modeId,
+            Minimum = 0, Maximum = 254, Step = 1, Default = 0, ammType = 'keybind', Pair = modeId,
             VisibleWhen = source, VisibleValues = visible})
         row({Id = modeId, Type = 'picker', Label = text(label .. ' mode'), Group = groupId,
             PresetValues = table.concat(modeValues, '|'), PresetLabels = 'Tap|Hold', Default = modeValues[1],
-            DecoType = 'keybind', VisibleWhen = source, VisibleValues = visible})
+            ammType = 'keybind', VisibleWhen = source, VisibleValues = visible})
         bindings[identity] = {key = settingId, mode = modeId}
         return bindings[identity]
     end
@@ -192,11 +192,11 @@ function M.generate(registry, options)
                         for _, field in ipairs(providerGroup.fields) do
                             local settingId = id({'provider', identity, field.id})
                             local metadata = {Id=settingId, Label=field.label, Group=groupId, Type=field.type,
-                                Default=field.default, Description=field.description, DecoLevel=field.level}
+                                Default=field.default, Description=field.description, ammLevel=field.level}
                             if field.type == 'picker' then
                                 metadata.PresetValues = table.concat(field.values, '|')
                                 metadata.PresetLabels = table.concat(field.labels, '|')
-                                metadata.DecoType = field.tab and 'tab' or nil
+                                metadata.ammType = field.tab and 'tab' or nil
                             else
                                 metadata.Minimum, metadata.Maximum, metadata.Step = field.min, field.max, field.step
                                 metadata.Suffix = field.suffix
@@ -226,7 +226,7 @@ function M.generate(registry, options)
             Description=options.description and text(options.description) or nil})
         local usedGroups = {}
         for _, item in ipairs(selectedRows) do usedGroups[item.Group] = true end
-        if usedGroups.Templates then append(output, 'Category.Templates', {DecoHeading=0}) end
+        if usedGroups.Templates then append(output, 'Category.Templates', {ammHeading=0}) end
         for _, groupId in ipairs(groupOrder) do
             if usedGroups[groupId] then append(output, 'Category.' .. groupId, groupSections[groupId]) end
         end
@@ -248,7 +248,7 @@ function M.generate(registry, options)
             assert(type(value) == 'number' and value == value, 'missing/invalid setting ' .. settingId)
             if r.Type == 'integer' then
                 assert(value >= r.Minimum and value <= r.Maximum and value % 1 == 0,
-                    (r.DecoType == 'keybind' and 'invalid key ' or 'invalid integer ') .. settingId)
+                    (r.ammType == 'keybind' and 'invalid key ' or 'invalid integer ') .. settingId)
             else
                 local found = false
                 for candidate in r.PresetValues:gmatch('[^|]+') do if value == tonumber(candidate) then found = true end end

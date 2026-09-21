@@ -44,6 +44,11 @@ for _, last in ipairs({2, 5}) do
         and result.pageByCategory['player.quickslots'].category == 'player.quickslots'
         and #result.pageByCategory['player.quickslots'].rows == #result.rows
         and #result.pageByCategory['player.stats'].rows == 0)
+    local quickslotsManifest = result.pageByCategory['player.quickslots'].manifest
+    check(not result.manifest:find('Deco', 1, true) and not quickslotsManifest:find('Deco', 1, true))
+    for _, key in ipairs({'ammType','ammLevel','ammHeading','ammLabelWhen','ammLabels'}) do
+        check(quickslotsManifest:find(key, 1, true), 'missing AMM metadata key '..key)
+    end
     local model, indices = modelFor(result, 'player.quickslots')
     local selector = result.selectors['player.quickslots']
     local selected = next(selector.byValue)

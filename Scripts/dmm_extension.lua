@@ -18,10 +18,25 @@ return {
         api.pages.build = function(tree, providers, status, hostApi)
             local ids = {}
             for _, provider in ipairs(providers) do ids[provider.id] = true end
+            local aggregate
+            for _, provider in ipairs(providers) do
+                if provider.name == 'Templates' then
+                    local ownsPages = true
+                    for _, page in ipairs(definitions.pages) do
+                        ownsPages = ownsPages and page.id == provider.id .. '.' .. page.category
+                    end
+                    if ownsPages then
+                        assert(aggregate == nil, 'duplicate TE aggregate provider')
+                        aggregate = provider
+                    end
+                end
+            end
+            assert(aggregate ~= nil, 'TE aggregate provider unavailable')
+            local categoryProviders = {}
             for _, page in ipairs(definitions.pages) do
                 assert(type(page.id) == 'string' and not ids[page.id], 'duplicate TE category provider')
                 local choices = api.choices.parse(page.manifest)
-                providers[#providers + 1] = {
+                categoryProviders[#categoryProviders + 1] = {
                     id = page.id,
                     name = page.name,
                     author = page.author or 'Templating Engine',
@@ -33,6 +48,8 @@ return {
                     testOnly = false,
                     logoFile = '',
                     logoAsset = '',
+                    ammBrowserLevel = 4,
+                    ammBrowserIndent = 20,
                 }
                 ids[page.id] = true
             end
@@ -42,6 +59,14 @@ return {
                 if an ~= bn then return an < bn end
                 return a.id < b.id
             end)
+            local aggregateIndex
+            for index, provider in ipairs(providers) do
+                if provider == aggregate then aggregateIndex = index; break end
+            end
+            assert(aggregateIndex ~= nil, 'TE aggregate provider lost during ordering')
+            for index, provider in ipairs(categoryProviders) do
+                table.insert(providers, aggregateIndex + index, provider)
+            end
             return build(tree, providers, status, hostApi)
         end
     end,
