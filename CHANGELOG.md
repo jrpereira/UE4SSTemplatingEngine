@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Add the `other` category family with the `other.unknown` fallback category.
+- Store registered subcategories as `_categories[module][category] = {}`.
 
 ## 0.0.17
 
