@@ -54,6 +54,7 @@ for _, last in ipairs({2, 5}) do
         check(quickslotsManifest:find(key, 1, true), 'missing AMM metadata key '..key)
     end
     local model, indices = modelFor(result, 'player.quickslots')
+    local rowsById = {}; for _, item in ipairs(result.rows) do rowsById[item.Id] = item end
     local selector = result.selectors['player.quickslots']
     local selected = next(selector.byValue)
     local definition = result.definitions['player.quickslots'][selected]
@@ -68,6 +69,12 @@ for _, last in ipairs({2, 5}) do
             and definition.direct['1'][slot].mode == scopePrefix .. 'Slot' .. slot .. 'Mode')
         check(definition.direct['2'][slot].key == scopePrefix .. 'Slot' .. (slot + 4)
             and definition.direct['2'][slot].mode == scopePrefix .. 'Slot' .. (slot + 4) .. 'Mode')
+    end
+    for _, slots in pairs(definition.direct) do
+        for _, pair in ipairs(slots) do
+            check(rowsById[pair.key].Pair == nil and rowsById[pair.key].ammType == 'keybind')
+            check(rowsById[pair.mode].Pair == pair.key and rowsById[pair.mode].ammType == 'tab')
+        end
     end
     check(model.items[indices[selector.id]].default==0 and definition.enabled==false)
     check(model.items[indices[definition.access]].default == 1

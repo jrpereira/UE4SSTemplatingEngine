@@ -127,12 +127,12 @@ function M.generate(registry, options)
         local settingId = publicId and namedId(publicId, {'binding', identity}) or id({'binding', identity})
         local modeId = settingId .. 'Mode'
         row({Id = settingId, Type = 'integer', Label = text(label), Group = groupId,
-            Minimum = 0, Maximum = 254, Step = 1, Default = defaultKey or 0, ammType = 'keybind', Pair = modeId,
+            Minimum = 0, Maximum = 254, Step = 1, Default = defaultKey or 0, ammType = 'keybind',
             VisibleWhen = source, VisibleValues = visible})
         row({Id = modeId, Type = 'picker', Label = text(label .. ' mode'), Group = groupId,
             PresetValues = table.concat(modeValues, '|'), PresetLabels = 'Tap|Hold',
             Default = defaultMode == nil and modeValues[1] or defaultMode,
-            ammType = 'keybind', VisibleWhen = source, VisibleValues = visible})
+            ammType = 'tab', Pair = settingId, VisibleWhen = source, VisibleValues = visible})
         bindings[identity] = {key = settingId, mode = modeId}
         return bindings[identity]
     end

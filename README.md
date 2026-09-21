@@ -49,7 +49,9 @@ te:registerTemplates("templates")
 
 Once templates are loaded, TE validates them, adds them to the mod menu, and remembers the active template for each category. It invokes lifecycle methods only while the selected template has `settings.enabled = true`.
 
-The `Templates` DMM page contains one template picker per populated category. TE also generates a DMM page for every registered category. When templates are available, the category page repeats that category's picker and contains the selected template's detailed controls, such as quickslot access mode and key assignments. Both picker views use the same persisted TE setting.
+The `Templates` DMM page and each generated category page use the category's selection policy. A category with `single = true` has one template picker. Other categories show one Yes/No picker per template and may activate several templates at once. Detailed controls remain scoped to their owning template.
+
+Generated key bindings follow AMM's mode-owned pairing contract. The mode picker survives as the composite row, uses `ammType=tab`, and declares `Pair=<key-setting-id>`. The integer key setting uses `ammType=keybind` without `Pair`; its normal DMM visibility determines whether the key component appears.
 
 ## Template format
 
