@@ -83,7 +83,7 @@ Every template declares `settings = { enabled = false }`, merging `groups` and `
 
 Only categories with registered templates appear in the menu. A host may register additional categories before loading templates.
 
-Every registered category starts as `{ visible = 0, count = 0, templates = {} }`. Category metadata can then be updated in place. For example, `te:setCategory("player.quickslots", { visible = 1 })` sets `_categories.player.quickslots.visible` while preserving `count` and `templates`. When registered files are loaded successfully, TE increments the category's `count` and appends each loaded template object to its `templates` array.
+Every registered category starts as `{ visible = 0, count = 0, templates = {} }`. Category metadata can then be updated in place. The core definitions set `single = true` on every `player.*` category. For example, `te:setCategory("player.quickslots", { visible = 1 })` sets `_categories.player.quickslots.visible` while preserving `single`, `count`, and `templates`. When registered files are loaded successfully, TE increments the category's `count` and appends each loaded template object to its `templates` array.
 
 `menu.fixes` accepts inert Lua templates with no `attach`, `render`, `detach`, `events`, or `subscribe` fields. TE can register and select them as category metadata, but it never invokes their exported callbacks or registers native hooks on their behalf.
 

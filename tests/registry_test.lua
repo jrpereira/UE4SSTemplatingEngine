@@ -11,14 +11,20 @@ local function rejects(fn, fragment)
     checks = checks + 1
 end
 local categories = Categories.new()
-dofile('categories.lua')(function(...) categories:registerCategory(...) end)
+dofile('categories.lua')(function(...) categories:registerCategory(...) end,
+    function(...) return categories:setCategory(...) end)
 check(table.concat(categories:list(), ',') == 'menu.controls,menu.fixes,menu.templates,npc.attacks,npc.intent,npc.level,npc.melee,npc.pawn,other.unknown,player.charges,player.compass,player.notifications,player.quickslots,player.self,player.stats,player.wheel')
 check(not categories:contains('player') and not categories:contains('npc') and not categories:contains('other'))
 check(categories._categories.player.quickslots.visible == 0)
 check(categories._categories.player.quickslots.count == 0)
+for _, category in ipairs({'quickslots','stats','charges','self','compass','notifications','wheel'}) do
+    check(categories._categories.player[category].single == true)
+    check(categories._categories.player[category].max == nil)
+end
 check(type(categories._categories.player.quickslots.templates) == 'table'
     and next(categories._categories.player.quickslots.templates) == nil)
 check(categories._categories.npc.intent.visible == 0)
+check(categories._categories.npc.intent.single == nil)
 check(categories._categories.npc.attacks.visible == 0)
 check(categories._categories.other.unknown.visible == 0)
 check(categories._categories.menu.controls.visible == 0

@@ -11,7 +11,8 @@ function M.new(options)
     assert(type(options) == 'table', 'host options required')
     local categories = Categories.new()
     local core = options.coreCategories or assert(loadfile(options.categoriesPath or 'categories.lua', 't'))()
-    core(function(...) categories:registerCategory(...) end)
+    core(function(...) categories:registerCategory(...) end,
+        function(...) return categories:setCategory(...) end)
     local registry = Registry.new(categories, options)
     local runtime = Lifecycle.new(registry, {resolveService=options.resolveService,resolveTarget=options.resolveTarget})
     local self = {registry = registry, categories = categories, runtime = runtime}
