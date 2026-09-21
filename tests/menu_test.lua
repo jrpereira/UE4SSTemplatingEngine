@@ -40,10 +40,12 @@ local firstResult
 for _, last in ipairs({2, 5}) do
     local result = Menu.generate(registryFor(fixture(last)))
     firstResult = firstResult or result
-    check(#result.aggregate.rows == 1 and #result.pages == 2
+    check(#result.aggregate.rows == 1 and #result.pages == 1
         and result.pageByCategory['player.quickslots'].category == 'player.quickslots'
         and #result.pageByCategory['player.quickslots'].rows == #result.rows
-        and #result.pageByCategory['player.stats'].rows == 0)
+        and result.pageByCategory['player.stats'] == nil)
+    check(result.aggregate.rows[1].Label == 'Quickslots' and result.aggregate.rows[1].Group == 'Player'
+        and result.aggregate.rows[1].ammTabsWidth == 440)
     local quickslotsManifest = result.pageByCategory['player.quickslots'].manifest
     check(not result.manifest:find('Deco', 1, true) and not quickslotsManifest:find('Deco', 1, true))
     for _, key in ipairs({'ammType','ammLevel','ammHeading','ammLabelWhen','ammLabels'}) do
@@ -120,9 +122,41 @@ for i = 1, 8 do many[i] = {collection = 'Tests', category = 'player.stats', name
     settings={enabled=false}} end
 local ordinary = Menu.generate(registryFor(many))
 local model, indices = modelFor(ordinary, 'player.stats')
-check(not model.items[indices[ordinary.selectors['player.stats'].id]].ammTabs)
+check(not model.items[indices[ordinary.selectors['player.stats'].id]].ammTabs
+    and ordinary.aggregate.rows[1].ammTabsWidth == nil)
 local empty = Menu.generate(registryFor({}))
-check(#empty.rows == 0 and #empty.pages == 2 and #empty.warnings == 2)
+check(#empty.rows == 0 and #empty.pages == 0 and #empty.warnings == 2
+    and next(empty.pageByCategory) == nil and next(empty.selectors) == nil)
+local groupedCategories = Categories.new()
+groupedCategories:registerCategory('player', {'quickslots', 'stats', 'charges'})
+groupedCategories:registerCategory('menu', {'controls', 'fixes', 'templates'})
+local groupedTemplates = {
+    fixture(2),
+    {collection='Tests',name='Stats+',category='player.stats',settings={enabled=false}},
+    {collection='Tests',name='Menu Fix',category='menu.fixes',settings={enabled=false}},
+}
+local groupedRegistry = Registry.new(groupedCategories, {execute=function() return groupedTemplates end})
+groupedRegistry:registerTemplate('grouped.lua'); groupedRegistry:loadTemplatesFromRegister()
+local grouped = Menu.generate(groupedRegistry)
+check(#grouped.aggregate.rows == 3 and #grouped.pages == 3)
+check(grouped.aggregate.rows[1]._category == 'menu.fixes'
+    and grouped.aggregate.rows[1].Label == 'Fixes' and grouped.aggregate.rows[1].Group == 'Menu'
+    and grouped.aggregate.rows[1].ammTabsWidth == 440)
+check(grouped.aggregate.rows[2]._category == 'player.quickslots'
+    and grouped.aggregate.rows[2].Label == 'Quickslots' and grouped.aggregate.rows[2].Group == 'Player')
+check(grouped.aggregate.rows[3]._category == 'player.stats'
+    and grouped.aggregate.rows[3].Label == 'Stats' and grouped.aggregate.rows[3].Group == 'Player'
+    and grouped.aggregate.rows[3].ammTabsWidth == 440)
+check(grouped.pageByCategory['menu.controls'] == nil and grouped.pageByCategory['menu.templates'] == nil
+    and grouped.pageByCategory['player.charges'] == nil)
+check(grouped.manifest:find('[Category.Menu]', 1, true)
+    and grouped.manifest:find('[Category.Player]', 1, true)
+    and grouped.manifest:find('ammTabsWidth=440', 1, true)
+    and not grouped.manifest:find('[Category.Templates]', 1, true))
+local groupedModel = modelFor(grouped)
+check(groupedModel.items[1].group == 'Menu' and groupedModel.items[1].ammGroup.heading
+    and groupedModel.items[2].group == 'Player' and groupedModel.items[2].ammGroup.heading
+    and groupedModel.items[3].group == 'Player' and groupedModel.items[3].ammGroup.heading)
 local bad = fixture(2); bad.name = 'Injected\n[Setting.Bad]'
 rejects(function() Menu.generate(registryFor(bad)) end, 'unsupported separators')
 bad = fixture(2); bad.actions = {Only = bad.actions[1]}

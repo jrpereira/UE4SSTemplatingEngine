@@ -39,7 +39,7 @@ end}, menu, function() return {playerActions = dofile('tests/support/service.lua
 function(ok, errors) outcomes[#outcomes + 1] = {ok = ok, errors = errors} end)
 local callback = assert(callbacks.UE4SSTemplatingEngine)
 check(callbacks['UE4SSTemplatingEngine.player.quickslots'] ~= nil)
-check(callbacks['UE4SSTemplatingEngine.player.stats'] ~= nil)
+check(callbacks['UE4SSTemplatingEngine.player.stats'] == nil)
 check(attaches == 0) -- Editing values locally has no runtime effect.
 local eventCallbacks,eventStops,eventOutcomes={},0,{}
 local stopEvents=te:subscribeEvents({subscribe=function(category,event,fn)

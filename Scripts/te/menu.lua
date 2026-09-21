@@ -17,6 +17,10 @@ local function key(parts)
     return table.concat(out)
 end
 
+local function title(value)
+    return value:gsub('_', ' '):gsub('(%a)([%w_]*)', function(a, b) return a:upper() .. b end)
+end
+
 -- The returned catalog must be persisted alongside the manifest before startup.
 -- Removed mappings remain reserved, preventing saved numeric choices from changing meaning.
 function M.generate(registry, options)
@@ -50,6 +54,7 @@ function M.generate(registry, options)
     local function id(parts) return 'TE_' .. allocate(parts) end
     local lines, rows, groups, bindings, selectors, warnings = {}, {}, {}, {}, {}, {}
     local groupSections, groupOrder = {}, {}
+    local aggregateGroups, aggregateGroupOrder = {}, {}
     local aggregateRows, pageRows, categoryLabels, currentCategory = {}, {}, {}, nil
     local function emit(section, fields)
         lines[#lines + 1] = '[' .. section .. ']'
@@ -62,7 +67,6 @@ function M.generate(registry, options)
     end
     emit('Mod', {Id = 'UE4SSTemplatingEngine', Name = 'Templates', Version = '0.0.17',
         Description = options.description and text(options.description) or nil})
-    emit('Category.Templates', {ammHeading = 0})
     local function row(fields)
         assert(#rows < 256, 'generated menu exceeds DMM limit of 256 settings')
         fields.ConfigFile, fields.ConfigSection, fields.ConfigKey = 'config.ini', 'Templates', fields.Id
@@ -73,11 +77,12 @@ function M.generate(registry, options)
         emit('Setting.' .. fields.Id, fields)
         return fields.Id
     end
-    local function picker(settingId, label, group, values, labels, source, visible, compact, level)
+    local function picker(settingId, label, group, values, labels, source, visible, compact, level, tabsWidth)
         return row({Id = settingId, Label = text(label), Group = group, Type = 'picker',
             PresetValues = table.concat(values, '|'), PresetLabels = table.concat(labels, '|'), Default = values[1],
             VisibleWhen = source, VisibleValues = visible, ammLevel = level,
-            ammType = compact and #values <= 8 and 'tab' or nil})
+            ammType = compact and #values <= 8 and 'tab' or nil,
+            ammTabsWidth = compact and #values <= 8 and tabsWidth or nil})
     end
     local function group(identity, label, selector, selected, source, visible, level, heading)
         local groupId = id({'group', identity})
@@ -122,7 +127,7 @@ function M.generate(registry, options)
     local decoded = {}
     for _, category in ipairs(registry.categories:list()) do
         local categoryLabel = (options.categoryLabels or {})[category]
-            or category:gsub('%.', ' '):gsub('(%a)([%w_]*)', function(a, b) return a:upper() .. b end)
+            or title(category:gsub('%.', ' '))
         categoryLabels[category] = categoryLabel
         local available = perCategory[category]
         if not available then
@@ -137,7 +142,14 @@ function M.generate(registry, options)
                 values[#values + 1], labels[#labels + 1] = value, text(entry.template.name)
                 byValue[value] = entry.id
             end
-            picker(selector, categoryLabel, 'Templates', values, labels, nil, nil, true, 2)
+            local prefix, suffix = assert(category:match('^([^.]+)%.([^.]+)$'))
+            local aggregateGroup = title(prefix)
+            if not aggregateGroups[aggregateGroup] then
+                aggregateGroups[aggregateGroup] = true
+                aggregateGroupOrder[#aggregateGroupOrder + 1] = aggregateGroup
+                emit('Category.' .. aggregateGroup, {})
+            end
+            picker(selector, title(suffix), aggregateGroup, values, labels, nil, nil, true, 2, 440)
             aggregateRows[#aggregateRows + 1] = rows[#rows]
             selectors[category] = {id = selector, byValue = byValue}
             decoded[category] = {}
@@ -220,13 +232,17 @@ function M.generate(registry, options)
         for _, name in ipairs(names) do target[#target + 1] = name .. '=' .. tostring(fields[name]) end
         target[#target + 1] = ''
     end
-    local function providerManifest(providerId, providerName, selectedRows)
+    local function providerManifest(providerId, providerName, selectedRows, aggregatePage)
         local output = {}
         append(output, 'Mod', {Id=providerId, Name=providerName, Version='0.0.17',
             Description=options.description and text(options.description) or nil})
         local usedGroups = {}
         for _, item in ipairs(selectedRows) do usedGroups[item.Group] = true end
-        if usedGroups.Templates then append(output, 'Category.Templates', {ammHeading=0}) end
+        for _, groupId in ipairs(aggregateGroupOrder) do
+            if usedGroups[groupId] then
+                append(output, 'Category.' .. groupId, aggregatePage and {} or {ammHeading=0})
+            end
+        end
         for _, groupId in ipairs(groupOrder) do
             if usedGroups[groupId] then append(output, 'Category.' .. groupId, groupSections[groupId]) end
         end
@@ -288,18 +304,20 @@ function M.generate(registry, options)
       end
     end
     local aggregateId = 'UE4SSTemplatingEngine'
-    local aggregateManifest = providerManifest(aggregateId, 'Templates', aggregateRows)
+    local aggregateManifest = providerManifest(aggregateId, 'Templates', aggregateRows, true)
     local allCategories = {}; for category in pairs(selectors) do allCategories[category] = true end
     local aggregate = {id=aggregateId, name='Templates', manifest=aggregateManifest, rows=aggregateRows,
         decode=makeDecoder(aggregateRows, allCategories)}
     local pages, pageByCategory, providers = {}, {}, {[aggregateId]=aggregate}
     for _, category in ipairs(registry.categories:list()) do
-        local providerId = aggregateId .. '.' .. category
-        local included, selectedRows = {[category]=true}, pageRows[category] or {}
-        local page = {id=providerId, name=categoryLabels[category], category=category,
-            rows=selectedRows, manifest=providerManifest(providerId, categoryLabels[category], selectedRows)}
-        page.decode = makeDecoder(page.rows, included)
-        pages[#pages + 1], pageByCategory[category], providers[providerId] = page, page, page
+        if selectors[category] then
+            local providerId = aggregateId .. '.' .. category
+            local included, selectedRows = {[category]=true}, pageRows[category]
+            local page = {id=providerId, name=categoryLabels[category], category=category,
+                rows=selectedRows, manifest=providerManifest(providerId, categoryLabels[category], selectedRows, false)}
+            page.decode = makeDecoder(page.rows, included)
+            pages[#pages + 1], pageByCategory[category], providers[providerId] = page, page, page
+        end
     end
     return {manifest = aggregateManifest, fullManifest = table.concat(lines, '\n'), catalog = catalog,
         rows = rows, selectors = selectors, definitions = decoded, warnings = warnings,
