@@ -7,7 +7,7 @@ local function check(value) assert(value); checks = checks + 1 end
 local categories = Categories.new(); categories:registerCategory('player', {'quickslots'})
 local calls, failAttach, failDetach, deferAttach = {}, false, false, false
 local function template(name)
-    return {collection = 'Tests', category = 'player.quickslots', name = name,
+    return {category = 'player.quickslots', name = name,
         settings = {target='templates',enabled=true},
         events = name == 'A' and {'GroupSelected'} or {'SlotActivated'},
         actions = {{name = 'Group', slots = 1, type = 'any'}},
@@ -32,7 +32,7 @@ local function template(name)
             return target.ready and 'applied' or 'not_ready'
         end}
 end
-local disabled={collection='Tests',category='player.quickslots',name='Disabled',settings={target='templates',enabled=false},
+local disabled={category='player.quickslots',name='Disabled',settings={target='templates',enabled=false},
     events={'GroupSelected'},actions={{name='Group',slots=1,type='any'}}}
 local registry = Registry.new(categories, {execute = function() return {template('A'), template('B'), disabled} end})
 registry:registerTemplate('test.lua'); registry:loadTemplatesFromRegister()
@@ -113,8 +113,8 @@ local eventResult,eventWhy=runtime:dispatch('player.quickslots','Unknown',contex
 check(eventResult==nil and eventWhy:find('unsupported player.quickslots event Unknown',1,true))
 local multiCategories=Categories.new();multiCategories:registerCategory('menu',{'fixes'})
 local multiTemplates={
-    {collection='Tests',category='menu.fixes',name='First',settings={target='templates',enabled=true}},
-    {collection='Tests',category='menu.fixes',name='Second',settings={target='templates',enabled=true}},
+    {category='menu.fixes',name='First',settings={target='templates',enabled=true}},
+    {category='menu.fixes',name='Second',settings={target='templates',enabled=true}},
 }
 local multiRegistry=Registry.new(multiCategories,{execute=function()return multiTemplates end})
 multiRegistry:registerTemplate('multi.lua');multiRegistry:loadTemplatesFromRegister()

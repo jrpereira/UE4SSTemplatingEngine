@@ -14,8 +14,15 @@ return {
             and type(api.pages.build) == 'function', 'DMM pages API unavailable')
         assert(type(api.choices) == 'table' and type(api.choices.parse) == 'function',
             'DMM choices API unavailable')
+        if api.pages._teCategoryPagesInstalled then return false end
+        api.pages._teCategoryPagesInstalled = true
         local build = api.pages.build
         api.pages.build = function(tree, providers, status, hostApi)
+            local generatedIds = {}
+            for _, page in ipairs(definitions.pages) do generatedIds[page.id] = true end
+            for index = #providers, 1, -1 do
+                if generatedIds[providers[index].id] then table.remove(providers, index) end
+            end
             local ids = {}
             for _, provider in ipairs(providers) do ids[provider.id] = true end
             local aggregate
@@ -42,7 +49,7 @@ return {
                     id = page.id,
                     name = page.name,
                     author = page.author or 'Templating Engine',
-                    version = page.version or '0.0.17',
+                    version = page.version or '0.0.18',
                     description = page.description or ('Templates and settings for ' .. page.name .. '.'),
                     choices = choices,
                     settingsCount = #choices,

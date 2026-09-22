@@ -90,7 +90,7 @@ function M.generate(registry, options)
         for _, name in ipairs(names) do lines[#lines + 1] = name .. '=' .. tostring(fields[name]) end
         lines[#lines + 1] = ''
     end
-    emit('Mod', {Id = 'UE4SSTemplatingEngine', Name = 'Templates', Version = '0.0.17',
+    emit('Mod', {Id = 'UE4SSTemplatingEngine', Name = 'Templates', Version = '0.0.18',
         Description = options.description and text(options.description) or nil})
     local function row(fields)
         assert(#rows < 256, 'generated menu exceeds DMM limit of 256 settings')
@@ -127,11 +127,12 @@ function M.generate(registry, options)
     local function binding(identity, label, groupId, source, visible, modeValues, publicId, defaultKey, defaultMode)
         local settingId = publicId and namedId(publicId, {'binding', identity}) or id({'binding', identity})
         local modeId = settingId .. 'Mode'
+        local modeLabels = #modeValues == 3 and modeValues[3] == -1 and 'Tap|Hold|Default' or 'Tap|Hold'
         row({Id = settingId, Type = 'integer', Label = text(label), Group = groupId,
             Minimum = 0, Maximum = 254, Step = 1, Default = defaultKey or 0, ammType = 'keybind',
             VisibleWhen = source, VisibleValues = visible})
         row({Id = modeId, Type = 'picker', Label = text(label), Group = groupId,
-            PresetValues = table.concat(modeValues, '|'), PresetLabels = 'Tap|Hold',
+            PresetValues = table.concat(modeValues, '|'), PresetLabels = modeLabels,
             Default = defaultMode == nil and modeValues[1] or defaultMode,
             ammType = 'tab', Pair = settingId, VisibleWhen = source, VisibleValues = visible})
         bindings[identity] = {key = settingId, mode = modeId}
@@ -156,7 +157,11 @@ function M.generate(registry, options)
             warnings[#warnings + 1] = category .. ': empty category omitted; DMM cannot render a None-only picker'
         else
             currentCategory = category
-            local categorySingle = registry.categories:getCategory(category).single == true
+            local categorySingle = available[1].single == true
+            for _, entry in ipairs(available) do
+                assert((entry.single == true) == categorySingle,
+                    category .. ': templates disagree on single')
+            end
             assert(#available <= 63, category .. ': more than 63 templates exceeds picker capacity including None')
             local selector
             local values, labels, byValue = {0}, {'None'}, {}
@@ -216,7 +221,8 @@ function M.generate(registry, options)
                                     'AccessMethod placement requires player.quickslots')
                                 groupId = groupId or group(key({identity, 'provider', providerGroup.id}),
                                     providerGroup.label, ownerSelector, ownerValue, ownerSelector, ownerValue,
-                                    providerGroup.level, nil, scopePrefix .. publicName(providerGroup.id))
+                                    providerGroup.level, providerGroup.heading == false and 0 or nil,
+                                    scopePrefix .. publicName(providerGroup.id))
                                 local settingId = namedId(scopePrefix .. publicName(field.id),
                                     {'provider', identity, field.id})
                                 local metadata = {Id=settingId, Label=field.label, Group=groupId, Type=field.type,
@@ -238,10 +244,10 @@ function M.generate(registry, options)
                 if category == 'player.quickslots' then
                     local ordered = V.orderedGroups(template, (options.groupOrders or {})[entry.id])
                     local access = namedId(scopePrefix .. 'AccessMethod', {'access', identity})
-                    local accessGroup = group(key({identity, 'access'}), 'Access Method', ownerSelector, ownerValue,
+                    local accessGroup = group(key({identity, 'access'}), 'Input Method', ownerSelector, ownerValue,
                         ownerSelector, ownerValue, 3, 0, scopePrefix .. 'AccessMethodSection')
-                    picker(access, 'Access Method', accessGroup, {0, 1},
-                        {'1 key per slot', 'Activate group first'}, nil, nil, true, 2, nil, 1)
+                    picker(access, 'Input Method', accessGroup, {0, 1},
+                        {'1 key per slot', 'Activate group first'}, nil, nil, true, 2, 440, 1)
                     definition.access = access
                     emitProviderFields('AccessMethod')
                     definition.direct, definition.groups, definition.shared = {}, {}, {}
@@ -268,8 +274,9 @@ function M.generate(registry, options)
                         access, 1, nil, nil, scopePrefix .. 'Groups')
                     for index, item in ipairs(ordered) do
                         local g = item.value
+                        local modes = index == 1 and {0, 2, -1} or {0, 2}
                         definition.groups[item.key] = binding(key({identity, 'activate', g.name}), g.name,
-                            activateGroup, nil, nil, {0, 2},
+                            activateGroup, nil, nil, modes,
                             scopePrefix .. 'Group' .. index, index == 2 and quickslotDefaults.swap or 0, 0)
                     end
                     local sharedGroup = group(key({identity, 'slots'}), 'Slots', ownerSelector, ownerValue,
@@ -300,7 +307,7 @@ function M.generate(registry, options)
     end
     local function providerManifest(providerId, providerName, selectedRows, aggregatePage)
         local output = {}
-        append(output, 'Mod', {Id=providerId, Name=providerName, Version='0.0.17',
+        append(output, 'Mod', {Id=providerId, Name=providerName, Version='0.0.18',
             Description=options.description and text(options.description) or nil})
         local usedGroups, visibleGroups, hiddenByGroup = {}, {}, {}
         for _, item in ipairs(selectedRows) do

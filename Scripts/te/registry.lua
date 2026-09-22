@@ -53,15 +53,28 @@ function M.new(categories, options)
                 pendingFiles[#pendingFiles + 1] = file.key
             end
         end
+        local categoryModes = {}
+        for _, entry in ipairs(self.templates) do
+            categoryModes[entry.template.category] = entry.single
+        end
         for _, entry in ipairs(additions) do
             local category = self.categories:getCategory(entry.template.category)
             assert(type(category.count) == 'number', entry.template.category .. ': count must be a number')
             assert(type(category.templates) == 'table', entry.template.category .. ': templates must be a table')
+            local single = entry.template.single
+            if single == nil then single = category.single end
+            if single == nil then single = false end
+            local prior = categoryModes[entry.template.category]
+            assert(prior == nil or prior == single,
+                entry.template.category .. ': templates disagree on single')
+            categoryModes[entry.template.category] = single
             entry.category = category
+            entry.single = single
         end
         for _, entry in ipairs(additions) do
             self.templates[#self.templates + 1] = entry
             self.byId[entry.id] = entry
+            entry.template.single = entry.single
             entry.category.count = entry.category.count + 1
             entry.category.templates[#entry.category.templates + 1] = entry.template
             entry.category = nil

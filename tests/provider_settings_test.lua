@@ -10,7 +10,7 @@ end
 local declaration={target='templates',enabled=true,groups={
     {id='Secondary',label='Secondary',level=4,order=3},
     {id='Primary',label='Primary Visuals',level=4,order=2},
-    {id='Visuals',label='Visuals',level=4,order=1},
+    {id='Visuals',label='Visuals',level=4,order=1,heading=false},
 },fields={
     {id='WheelsDisplayed',type='picker',values={1,2},labels={'One','Two'},default=2,
         label='Wheels Displayed',group='Visuals',order=1,tab=true,level=4,after='AccessMethod'},
@@ -29,7 +29,7 @@ for _, role in ipairs({'Primary','Secondary'}) do
             default=defaults[id],label=name,group=role,order=i,suffix=step==5 and '%' or nil}
     end
 end
-local template={collection='Provider test',name='Visuals',category='player.quickslots',
+local template={name='Visuals',category='player.quickslots',
     actions={{name='Actions',slots=1,type='any'}},settings=declaration}
 local attaches=0
 function template:attach(_,target,spec,previous)
@@ -55,6 +55,8 @@ check(index[provider.WheelsDisplayed]==index[def.access]+1)
 check(index[provider.WheelsDisplayed]<index[provider.PrimaryWheel])
 check(index[provider.PrimaryOpacity]<index[provider.SecondaryX])
 check(items[index[provider.WheelsDisplayed]].ammTabs and items[index[provider.PrimaryX]].ammGroup.font==4)
+check(items[index[provider.WheelsDisplayed]].ammGroup.heading==false
+    and items[index[provider.PrimaryWheel]].ammGroup.heading==false)
 check(items[index[provider.PrimarySize]].suffix=='%')
 model:set(index[selector.id],value)
 model:set(index[provider.WheelsDisplayed],1)
@@ -91,6 +93,7 @@ local function invalid(change, message)
 end
 invalid(function(d) d.fields[1].id=d.fields[2].id end,'duplicate provider field')
 invalid(function(d) d.groups[1].id=d.groups[2].id end,'duplicate provider group')
+invalid(function(d) d.groups[1].heading=0 end,'provider group heading must be boolean')
 invalid(function(d) d.fields[1].group='Missing' end,'undeclared provider group')
 invalid(function(d) d.fields[1].default=3 end,'default must match')
 invalid(function(d) d.fields[1].values={1,1} end,'duplicate provider choice')

@@ -7,7 +7,7 @@ local te = TE.new({listFiles = function() return {} end})
 te:registerTemplate(path)
 check(te:loadTemplatesFromRegister() == 1)
 local entry = te.registry.templates[1]
-check(entry.template.settings.enabled == false)
+check(entry.template.settings.enabled == true)
 check(entry.template.actionOrder == nil)
 check(#entry.template.actions == 2)
 check(entry.template.actions[1].name == 'Abilities' and entry.template.actions[1].type == 'ability')
@@ -20,7 +20,7 @@ check(#definition.shared == 4)
 local values = {}; for _, row in ipairs(menu.rows) do values[row.Id] = tonumber(row.Default) end
 values[selector.id] = selected
 values[definition.access] = 1
-values[definition.shared[1].mode], values[definition.groups['1'].mode] = 1, 2
+values[definition.shared[1].mode] = 1
 local service = {}
 local switcher = {id='quickslots-switcher', children={{id='wheel:1'}, {id='wheel:2'}}}
 function switcher:GetChildrenCount() return #self.children end
@@ -43,7 +43,8 @@ values[definition.settings.PrimaryX] = 37
 check(te.runtime:commit({revision = 2, values = values}, menu.decode, context))
 check(te.runtime.active['player.quickslots'].handle == handle and handle.settings.PrimaryX == 37)
 local _, committed = te.runtime:selection('player.quickslots')
-check(committed.groups['1'].mode == 2 and committed.groups['2'].mode == 0 and committed.shared[1].mode == 1)
+check(committed.groups['1'].key == 0 and committed.groups['1'].mode == 0
+    and committed.groups['2'].mode == 0 and committed.shared[1].mode == 1)
 check(handle.settings ~= committed.settings)
 for _, kind in ipairs({'wheel_layout', 'hud_indicators', 'ability_radial_indicators', 'swap_prompt'}) do
     check(te.runtime:render('player.quickslots', context, {kind=kind}, 'created') == 'not_ready')

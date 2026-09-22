@@ -40,10 +40,12 @@ function M.normalize(declaration)
     local groups, byId, fields = {}, {}, {}
     for index, source in ipairs(declaredGroups) do
         assert(type(source) == 'table', 'provider group must be a table')
-        allowed(source, {id=true,label=true,level=true,order=true}, 'provider group')
+        allowed(source, {id=true,label=true,level=true,order=true,heading=true}, 'provider group')
         identifier(source.id, 'provider group id'); text(source.label, 'provider group label'); level(source.level)
+        assert(source.heading == nil or type(source.heading) == 'boolean',
+            'provider group heading must be boolean')
         assert(not byId[source.id], 'duplicate provider group ' .. source.id)
-        local g = {id=source.id,label=source.label,level=source.level or 4,
+        local g = {id=source.id,label=source.label,level=source.level or 4,heading=source.heading,
             order=order(source.order,index),index=index,fields={}}
         groups[#groups+1], byId[source.id] = g, g
     end

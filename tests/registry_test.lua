@@ -41,33 +41,37 @@ check(categories._categories.player.quickslots.visible == 1)
 check(categories:setCategory('other.unknown', {visible=1, count=2}).visible == 1)
 check(categories._categories.other.unknown.count == 2 and categories:contains('other.unknown'))
 rejects(function() categories:setCategory('missing', {visible=1}) end, 'unregistered category')
-check(V.template({collection='Tests',name='Unknown',category='other.unknown',settings={target='templates',enabled=false}}, categories, 'unknown.lua').category == 'other.unknown')
-rejects(function() V.template({collection='Tests',name='Missing Settings',category='other.unknown'},
+check(V.template({name='Unknown',category='other.unknown',settings={target='templates',enabled=false}}, categories, 'unknown.lua').category == 'other.unknown')
+rejects(function() V.template({name='Missing Settings',category='other.unknown'},
     categories,'missing.lua') end,'settings must be a table')
-rejects(function() V.template({collection='Tests',name='Missing Target',category='other.unknown',
+rejects(function() V.template({name='Missing Target',category='other.unknown',
     settings={enabled=false}},categories,'missing-target.lua') end,'settings.target must be templates or module')
-rejects(function() V.template({collection='Tests',name='Bad Target',category='other.unknown',
+rejects(function() V.template({name='Bad Target',category='other.unknown',
     settings={target='modules',enabled=false}},categories,'bad-target.lua') end,'settings.target must be templates or module')
-check(V.template({collection='Tests',name='Enabled',category='other.unknown',
+check(V.template({name='Enabled',category='other.unknown',
     settings={target='templates',enabled=true}},categories,'enabled.lua').settings.enabled == true)
-rejects(function() V.template({collection='Tests',name='Invalid Enabled',category='other.unknown',
+rejects(function() V.template({name='Invalid Enabled',category='other.unknown',
     settings={target='templates',enabled=1}},categories,'enabled.lua') end,'settings.enabled must be boolean')
+check(V.template({name='Single',category='other.unknown',single=true,
+    settings={target='templates',enabled=false}},categories,'single.lua').single == true)
+rejects(function() V.template({name='Invalid Single',category='other.unknown',single=1,
+    settings={target='templates',enabled=false}},categories,'single.lua') end,'single: expected boolean or nil')
 rejects(function() categories:registerCategory('player', {'quickslots'}) end, 'duplicate category')
 rejects(function() categories:registerCategory('custom', {'a', 'a'}) end, 'duplicate category')
 check(not categories:contains('custom'))
-check(V.template({collection='Tests',name='Notice',category='player.notifications',settings={target='templates',enabled=false}}, categories, 'notice.lua').category == 'player.notifications')
-check(V.template({collection='Tests',name='Fixes',category='menu.fixes',settings={target='templates',enabled=false}},categories,'fixes.lua',true).category=='menu.fixes')
+check(V.template({name='Notice',category='player.notifications',settings={target='templates',enabled=false}}, categories, 'notice.lua').category == 'player.notifications')
+check(V.template({name='Fixes',category='menu.fixes',settings={target='templates',enabled=false}},categories,'fixes.lua',true).category=='menu.fixes')
 local indicator='/Game/_Dawnwalker/UI/_Unified/Combat/WBP_CombatTargetIndicator.WBP_CombatTargetIndicator_C'
-check(V.template({collection='Tests',name='Attacks',category='npc.attacks',settings={target='templates',enabled=false},subscribe={{path=indicator,
+check(V.template({name='Attacks',category='npc.attacks',settings={target='templates',enabled=false},subscribe={{path=indicator,
     events={'created'},contexts={'combat'}}}},categories,'attacks.lua').category=='npc.attacks')
 local Events=require('te.event_contracts')
 check(Events.active({contexts={'combat'}},{contexts={combat=true}}))
 check(not Events.active({contexts={'combat'}},{contexts={'openworld'}}))
-rejects(function() V.template({collection='Tests',name='Attacks',category='npc.attacks',settings={target='templates',enabled=false},subscribe={{path='Bad',
+rejects(function() V.template({name='Attacks',category='npc.attacks',settings={target='templates',enabled=false},subscribe={{path='Bad',
     events={'created'},contexts={'combat'}}}},categories,'attacks.lua') end,'unsupported npc.attacks path Bad')
 check(not categories:contains('player.actions') and not categories:contains('quickslots'))
 local function template(name)
-    return {collection = 'Tests', name = name or 'First', category = 'player.quickslots',
+    return {name = name or 'First', category = 'player.quickslots',
         settings={target='templates',enabled=false},
         actions = {A = {name = 'Alpha', slots = 4, type = 'any'}}}
 end
@@ -86,9 +90,10 @@ local quickslots = categories._categories.player.quickslots
 check(quickslots.count == 2 and #quickslots.templates == 2)
 check(quickslots.templates[1] == registry.templates[1].template
     and quickslots.templates[2] == registry.templates[2].template)
+check(registry.templates[1].single == true and registry.templates[1].template.single == true)
 check(U.identity(template()) ~= U.identity(template('Second')))
-rejects(function() V.flatten({category = 'player.quickslots'}, categories, 'bad.lua') end, 'bad.lua.collection')
-rejects(function() V.flatten({collection='Tests',category='player.quickslots',name='Bad',
+rejects(function() V.flatten({category = 'player.quickslots'}, categories, 'bad.lua') end, 'bad.lua.name')
+rejects(function() V.flatten({category='player.quickslots',name='Bad',
     settings={target='templates',enabled=false},actions={{name='Group',slots=1,type='any'}},events={'Unknown'}},categories,'bad.lua') end,
     'unsupported player.quickslots event Unknown')
 local invalid = template(); invalid.category = 'npc.actions'
@@ -110,6 +115,23 @@ declared.actionOrder = {'Missing'}
 rejects(function() V.template(declared, categories, 'declared', false) end, 'invalid/duplicate group order entry')
 rejects(function() V.orderedGroups(template(), {'A', 'A'}) end, 'duplicate')
 rejects(function() V.template(template(), categories, 'runtime', true) end, 'runtime.attach')
+local function modeRegistry(categorySingle, templates)
+    local modeCategories=Categories.new()
+    modeCategories:registerCategory('custom',{'mode'})
+    if categorySingle~=nil then modeCategories:setCategory('custom.mode',{single=categorySingle}) end
+    local modeRegistry=Registry.new(modeCategories,{execute=function() return templates end})
+    modeRegistry:registerTemplate('mode.lua')
+    return modeRegistry
+end
+local fallback=modeRegistry(true,{{name='Fallback',category='custom.mode',settings={target='templates',enabled=false}}})
+check(fallback:loadTemplatesFromRegister()==1 and fallback.templates[1].template.single==true)
+local override=modeRegistry(true,{{name='Override',category='custom.mode',single=false,settings={target='templates',enabled=false}}})
+check(override:loadTemplatesFromRegister()==1 and override.templates[1].template.single==false)
+local conflict=modeRegistry(nil,{
+    {name='First mode',category='custom.mode',single=true,settings={target='templates',enabled=false}},
+    {name='Second mode',category='custom.mode',single=false,settings={target='templates',enabled=false}},
+})
+rejects(function() conflict:loadTemplatesFromRegister() end,'templates disagree on single')
 sources['c.lua'] = template('Third'); sources['d.lua'] = template('First')
 registry:registerTemplate('c.lua'); registry:registerTemplate('d.lua')
 rejects(function() registry:loadTemplatesFromRegister() end, 'duplicate template identity')

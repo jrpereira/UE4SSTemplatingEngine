@@ -3,7 +3,7 @@ local C,R,L=require('te.categories'),require('te.registry'),require('te.lifecycl
 local checks=0
 local function check(value) assert(value);checks=checks+1 end
 local categories=C.new();categories:registerCategory('menu',{'fixes'})
-local template={collection='Adaptive Mod Menu',name='Dawnwalker Settings Page Fixes',category='menu.fixes',
+local template={name='Dawnwalker Settings Page Fixes',category='menu.fixes',
     settings={target='templates',enabled=false},
     createCallbacks=function() error('inert template callback must not run') end}
 local registry=R.new(categories,{execute=function() return template end})

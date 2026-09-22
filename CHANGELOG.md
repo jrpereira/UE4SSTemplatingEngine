@@ -1,8 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.0.18 - 2026-09-22
 
-- Require boolean `settings.enabled`; bundled templates default to `false`, and TE skips their lifecycle methods while disabled.
+- Remove the obsolete `collection` field and use category/name identities for templates.
+- Let a template's `single` value override category metadata, with category metadata as the fallback when omitted.
+- Rebuild generated DMM category pages idempotently after loading a game.
+- Add heading-free provider groups and align the Input Method tabs with the template picker.
+- Give the first group activation binding `Tap | Hold | Default` (`0|2|-1`) while preserving sustain-style `Tap | Hold` (`0|2`) for later groups and `0|1` for regular slots.
+- Require boolean `settings.enabled`; bundled templates default to `true`, and TE skips lifecycle methods while disabled.
 
 - Validate category event interests and route declared events through service-first template callbacks.
 - Retry pending attachments when a declared category event arrives.

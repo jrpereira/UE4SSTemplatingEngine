@@ -24,10 +24,12 @@ end
 
 function M.template(template, categories, where, runtime)
     assert(type(template) == 'table', where .. ': expected template object')
-    U.text(template.collection, where .. '.collection')
+    assert(template.collection == nil, where .. '.collection: removed field')
     U.text(template.category, where .. '.category')
     assert(categories:contains(template.category), where .. ': unregistered category ' .. template.category)
     U.text(template.name, where .. '.name')
+    assert(template.single == nil or type(template.single) == 'boolean',
+        where .. '.single: expected boolean or nil')
     assert(template.providerSettings == nil, where .. '.providerSettings: renamed to settings')
     Provider.normalize(template.settings)
     assert(template.modules==nil,where..'.modules: declare native targets inside events')
@@ -56,8 +58,7 @@ function M.flatten(value, categories, where)
         assert(type(item) == 'table', path .. ': expected template or array')
         assert(not visiting[item], path .. ': cyclic template array')
         -- Partial objects must receive object diagnostics, not array errors.
-        if rawget(item, 'collection') ~= nil or rawget(item, 'category') ~= nil
-            or rawget(item, 'name') ~= nil then
+        if rawget(item, 'category') ~= nil or rawget(item, 'name') ~= nil then
             M.template(item, categories, path, false)
             out[#out + 1] = {template = item, location = path}
             return

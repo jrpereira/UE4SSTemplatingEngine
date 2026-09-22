@@ -13,7 +13,7 @@ local dmmPath = assert(os.getenv('TE_DMM_CHOICES'), 'TE_DMM_CHOICES required for
 local ammPath = assert(os.getenv('TE_AMM_PRESENTATION'), 'TE_AMM_PRESENTATION required for actual decorator tests')
 local Choices, Presentation = dofile(dmmPath), dofile(ammPath)
 local function fixture(last, name)
-    return {collection = 'Tests', name = name or 'Quickslots++', category = 'player.quickslots',
+    return {name = name or 'Quickslots++', category = 'player.quickslots',
         settings={target='templates',enabled=false}, actions = {
         {name = 'Consumables', slots = 4, type = 'consumables'},
         {name = 'Abilities', slots = 4, type = 'abilities'},
@@ -64,6 +64,10 @@ for _, last in ipairs({2, 5}) do
         and definition.firstDefault == nil and rowsById.TE_FirstGroupDefault == nil)
     check(definition.groups['1'].key == scopePrefix .. 'Group1'
         and definition.groups['2'].key == scopePrefix .. 'Group2')
+    check(rowsById.TE_Group1Mode.PresetValues == '0|2|-1'
+        and rowsById.TE_Group1Mode.PresetLabels == 'Tap|Hold|Default')
+    check(rowsById.TE_Group2Mode.PresetValues == '0|2'
+        and rowsById.TE_Group2Mode.PresetLabels == 'Tap|Hold')
     for slot = 1, 4 do
         check(definition.direct['1'][slot].key == scopePrefix .. 'Slot' .. slot
             and definition.direct['1'][slot].mode == scopePrefix .. 'Slot' .. slot .. 'Mode')
@@ -78,7 +82,9 @@ for _, last in ipairs({2, 5}) do
         end
     end
     check(model.items[indices[selector.id]].default==0 and definition.enabled==false)
-    check(model.items[indices[definition.access]].default == 1)
+    check(model.items[indices[definition.access]].default == 1
+        and model.items[indices[definition.access]].label == 'Input Method'
+        and model.items[indices[definition.access]].ammTabsWidth == 440)
     check(model.items[indices[definition.groups['2'].key]].default == 164)
     for slot = 1, 4 do
         check(model.items[indices[definition.direct['1'][slot].key]].default == 48 + slot)
@@ -148,18 +154,22 @@ local removed = Menu.generate(registryFor(fixture(2, 'AAA')), {catalog = more.ca
 local restored = Menu.generate(baseRegistry, {catalog = removed.catalog})
 check(valueFor(initial, originalId) == valueFor(restored, originalId))
 local many = {}
-for i = 1, 8 do many[i] = {collection = 'Tests', category = 'player.stats', name = 'Stats ' .. i,
+for i = 1, 8 do many[i] = {category = 'player.stats', name = 'Stats ' .. i,
     settings={target='templates',enabled=false}} end
 local ordinary = Menu.generate(registryFor(many))
 local model, indices = modelFor(ordinary, 'player.stats')
 check(not model.items[indices[ordinary.selectors['player.stats'].id]].ammTabs
     and ordinary.aggregate.rows[1].ammTabsWidth == nil)
+local overrideFixture=fixture(2,'Override');overrideFixture.single=false
+local overrideMenu=Menu.generate(registryFor(overrideFixture))
+check(overrideMenu.selectors['player.quickslots']==nil
+    and #overrideMenu.multiSelectors['player.quickslots']==1)
 local multiCategories = Categories.new()
 multiCategories:registerCategory('other', {'unknown'})
 local multiRegistry = Registry.new(multiCategories, {execute=function() return {
-    {collection='Tests',name='First Attack',category='other.unknown',settings={target='templates',enabled=false}},
-    {collection='Tests',name='Second Attack',category='other.unknown',settings={target='templates',enabled=false}},
-    {collection='Tests',name='Third Attack',category='other.unknown',settings={target='templates',enabled=false}},
+    {name='First Attack',category='other.unknown',settings={target='templates',enabled=false}},
+    {name='Second Attack',category='other.unknown',settings={target='templates',enabled=false}},
+    {name='Third Attack',category='other.unknown',settings={target='templates',enabled=false}},
 } end})
 multiRegistry:registerTemplate('multi.lua'); multiRegistry:loadTemplatesFromRegister()
 local multi = Menu.generate(multiRegistry)
@@ -187,8 +197,8 @@ end
 groupedCategories:registerCategory('menu', {'controls', 'fixes', 'templates'})
 local groupedTemplates = {
     fixture(2),
-    {collection='Tests',name='Stats+',category='player.stats',settings={target='templates',enabled=false}},
-    {collection='Tests',name='Menu Fix',category='menu.fixes',settings={target='templates',enabled=false}},
+    {name='Stats+',category='player.stats',settings={target='templates',enabled=false}},
+    {name='Menu Fix',category='menu.fixes',settings={target='templates',enabled=false}},
 }
 local groupedRegistry = Registry.new(groupedCategories, {execute=function() return groupedTemplates end})
 groupedRegistry:registerTemplate('grouped.lua'); groupedRegistry:loadTemplatesFromRegister()
@@ -220,11 +230,11 @@ routedCategories:registerCategory('npc', {'attacks'})
 local routedTemplates = {}
 local function routedQuick(module, number)
     local item=fixture(1, module .. ' Quickslots ' .. number)
-    item.collection, item.settings.target = module, 'module'
+    item.settings.target = 'module'
     return item
 end
 local function routedAttack(module, number)
-    return {collection=module,name=module..' Attack '..number,category='npc.attacks',
+    return {name=module..' Attack '..number,category='npc.attacks',
         settings={target='module',enabled=false},subscribe={{
             path='/Game/_Dawnwalker/UI/_Unified/Combat/WBP_CombatTargetIndicator.WBP_CombatTargetIndicator_C',
             events={'created'},contexts={'combat'}}}}
@@ -260,7 +270,7 @@ check(#Menu.generate(mappedRegistry, {groupOrders = {[mappedRegistry.templates[1
 rejects(function() Menu.generate(registryFor(fixture(125))) end, '256 settings')
 rejects(function() Menu.generate(baseRegistry, {catalog = {version = 1, next = 3, entries = {a = 1, b = 1}}}) end, 'invalid catalog entry')
 local tooMany = {}
-for i = 1, 64 do tooMany[i] = {collection = 'Tests', category = 'player.stats', name = 'Stats ' .. i,
+for i = 1, 64 do tooMany[i] = {category = 'player.stats', name = 'Stats ' .. i,
     settings={target='templates',enabled=false}} end
 rejects(function() Menu.generate(registryFor(tooMany)) end, '63 templates')
 local tooLarge = fixture(2); tooLarge.actions = {}

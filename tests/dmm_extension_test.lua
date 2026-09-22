@@ -31,7 +31,9 @@ local ok, failure = xpcall(function()
             return 'built'
         end},
     }
-    dofile(root..'/Scripts/dmm_extension.lua').install(buildApi)
+    local extension=dofile(root..'/Scripts/dmm_extension.lua')
+    check(extension.install(buildApi)==nil)
+    check(extension.install(buildApi)==false)
     check(buildApi.pages.build(tree, providers, status, hostApi) == 'built')
     check(forwarded.tree == tree and forwarded.providers == providers
         and forwarded.status == status and forwarded.hostApi == hostApi)
@@ -45,6 +47,9 @@ local ok, failure = xpcall(function()
         check(providers[index].settingsCount == 1 and #providers[index].choices == 1)
     end
     check(providers[3].ammBrowserLevel == nil and providers[3].ammBrowserIndent == nil)
+    check(buildApi.pages.build(tree, providers, status, hostApi) == 'built')
+    check(#providers == #expected)
+    for index, id in ipairs(expected) do check(providers[index].id == id, 'rebuild order mismatch at '..index) end
 end, debug.traceback)
 
 if previous ~= nil then

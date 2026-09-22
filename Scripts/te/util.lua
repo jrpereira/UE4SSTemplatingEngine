@@ -22,7 +22,7 @@ end
 function M.identity(template)
     -- Length framing prevents delimiter collisions without changing user strings.
     local out = {}
-    for _, value in ipairs({template.collection, template.category, template.name}) do
+    for _, value in ipairs({template.category, template.name}) do
         out[#out + 1] = #value .. ':' .. value
     end
     return table.concat(out)

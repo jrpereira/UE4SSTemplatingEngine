@@ -10,7 +10,7 @@ local function rejects(fn, part)
 end
 local categories = C.new(); categories:registerCategory('player', {'quickslots'})
 categories:setCategory('player.quickslots', {single=true})
-local template = {collection = 'Robustness', name = 'Lifecycle', category = 'player.quickslots',
+local template = {name = 'Lifecycle', category = 'player.quickslots',
     settings={target='templates',enabled=true},
     actions = {A = {name = 'Alpha', slots = 1, type = 'any'}, B = {name = 'Beta', slots = 2, type = 'any'}}}
 local registry = R.new(categories, {execute = function() return template end})
@@ -53,7 +53,7 @@ check(runtime.revision == 0)
 local opts = {groupOrders = {[identity] = {'A', 'B'}}}
 local base = M.generate(registry, opts)
 for _, values in ipairs({{0}, {0, 0}, {0, math.huge}, {'0', 1}, {[1] = 0, [3] = 1}}) do
-    rejects(function() M.generate(registry, {slotModeValues = values}) end, 'slot mode')
+    rejects(function() M.generate(registry, {slotModeValues = values, groupOrders = opts.groupOrders}) end, 'slot mode')
 end
 rejects(function() M.generate(registry, {catalog = {version = 1, next = 1000000002, entries = {}}}) end, 'catalog counter')
 rejects(function() M.generate(registry, {catalog = {version = 1, next = 2, entries = {bad = 2}}}) end, 'catalog entry')
@@ -73,6 +73,8 @@ defaults[a.groups.A.mode] = 1
 rejects(function() base.decode(defaults) end, 'invalid choice')
 defaults[a.groups.A.mode] = 2
 check(base.decode(defaults)['player.quickslots'].configuration.groups.A.mode == 2)
+defaults[a.groups.A.mode] = -1
+check(base.decode(defaults)['player.quickslots'].configuration.groups.A.mode == -1)
 
 -- Round-trip the catalog through a data-only Lua literal, like a host persistence adapter.
 local keys = {}; for k in pairs(base.catalog.entries) do keys[#keys + 1] = k end; table.sort(keys)

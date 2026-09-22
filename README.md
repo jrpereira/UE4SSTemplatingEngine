@@ -8,7 +8,6 @@ Create `templates/my_quickslots.lua`:
 
 ```lua
 local template = {
-    collection = "My Dawnwalker Mods",
     name = "My Quickslots",
     category = "player.quickslots",
     settings = { target = "module", enabled = false },
@@ -49,17 +48,16 @@ te:registerTemplates("templates")
 
 Once templates are loaded, TE validates them, adds them to the mod menu, and remembers the active template for each category. It invokes lifecycle methods only while the selected template has `settings.enabled = true`.
 
-The `Templates` DMM page always aggregates every loaded template. A category with `single = true` has one template picker. Other categories show one Yes/No picker per template and may activate several templates at once.
+The `Templates` DMM page always aggregates every loaded template. A template may declare `single = true` or `single = false`; when it omits the field, TE copies the category's `single` value as its fallback. Templates sharing a category must resolve to the same value. A single category has one template picker. Other categories show one Yes/No picker per template and may activate several templates at once.
 
-Every template also declares its menu target with `settings.target`. Generated pages after `Templates` are grouped by category, such as `Player Quickslots` and `NPC Attacks`; templates from different collections share the appropriate category page.
+Every template also declares its menu target with `settings.target`. Generated pages after `Templates` are grouped by category, such as `Player Quickslots` and `NPC Attacks`; every template in a category shares the appropriate category page.
 
-Generated key bindings follow AMM's mode-owned pairing contract. The mode picker survives as the composite row, uses `ammType=tab`, and declares `Pair=<key-setting-id>`. The integer key setting uses `ammType=keybind` without `Pair`; its normal DMM visibility determines whether the key component appears.
+Generated key bindings follow AMM's mode-owned pairing contract. The mode picker survives as the composite row, uses `ammType=tab`, and declares `Pair=<key-setting-id>`. The integer key setting uses `ammType=keybind` without `Pair`; its normal DMM visibility determines whether the key component appears. Group-first input gives the first group a `Default` choice (`-1`) that inherits the prior behavior and disables its custom key capture; later group bindings keep Tap and sustain-style Hold choices.
 
 ## Template format
 
 Each template needs:
 
-- `collection`: the mod or template-pack name.
 - `name`: the name shown to players.
 - `category`: the game feature it replaces.
 - `attach`, `render`, and `detach`: the runtime lifecycle.
@@ -76,7 +74,7 @@ A template file may return one template or a nested array of templates. Template
 
 The `player.quickslots` service exposes `valid`, `same`, `identity`, and `parent`. A quickslots template calls these methods directly. TE resolves the current QuickslotsSwitcher and invokes `attach(service, target, configuration, previousHandle)` only when that target is valid. If it is unavailable, TE keeps the selection pending without calling template code. A declared category event retries the attachment with its resolved target, then invokes `render(service, handle, target, eventName)`. Handles retain provider-owned mutation and restoration state; templates do not rediscover or retain the category parent merely for later rendering.
 
-Every template declares `settings.target` (`"templates"` or `"module"`) and a boolean `settings.enabled`, merging `groups` and `fields` into that table when it exposes menu controls. Bundled templates default `enabled` to `false`, and a fresh configuration keeps the category selector at `None`; existing saved selections remain unchanged. A disabled template may remain selected, but TE records it without calling `attach`, `render`, or `detach`. TE validates committed `configuration.settings` values against any declared fields before invoking enabled lifecycle code. Templates can import `require("te.widget")` for generic UE widget operations: `unwrap`, `property`, `number`, `translation`, `scale`, `opacity`, `setTranslation`, `setScale`, `setOpacity`, `snapshotSlot`, and `restoreSlot`. Layout policy, widget ownership, restoration journals, and category behavior stay in the template.
+Every template declares `settings.target` (`"templates"` or `"module"`) and a boolean `settings.enabled`, merging `groups` and `fields` into that table when it exposes menu controls. A settings group may declare `heading = false` to keep its grouping and order without rendering a separator. Bundled templates default `enabled` to `true`, while a fresh configuration still keeps each category selector at `None`; a template begins running only after it is selected. A disabled template may remain selected, but TE records it without calling `attach`, `render`, or `detach`. TE validates committed `configuration.settings` values against any declared fields before invoking enabled lifecycle code. Templates can import `require("te.widget")` for generic UE widget operations: `unwrap`, `property`, `number`, `translation`, `scale`, `opacity`, `setTranslation`, `setScale`, `setOpacity`, `snapshotSlot`, and `restoreSlot`. Layout policy, widget ownership, restoration journals, and category behavior stay in the template.
 
 ## Built-in categories
 
@@ -91,4 +89,4 @@ Every registered category starts as `{ visible = 0, count = 0, templates = {} }`
 
 `menu.fixes` accepts inert Lua templates with no `attach`, `render`, `detach`, `events`, or `subscribe` fields. TE can register and select them as category metadata, but it never invokes their exported callbacks or registers native hooks on their behalf.
 
-> The current `0.0.17` menu-test build exercises registration, validation, menu generation, persistence, and Apply callbacks. Native discovery, gameplay input, and visual cutover are still under development.
+> The current `0.0.18` menu-test build exercises registration, validation, menu generation, persistence, and Apply callbacks. Native discovery, gameplay input, and visual cutover are still under development.

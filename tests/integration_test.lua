@@ -2,7 +2,7 @@ package.path = 'Scripts/?.lua;' .. package.path
 local TE = require('te.init')
 local checks = 0
 local function check(value) assert(value); checks = checks + 1 end
-local template = {collection = 'Integration', category = 'player.quickslots', name = 'Integrated',
+local template = {category = 'player.quickslots', name = 'Integrated',
     settings = {target='templates',enabled=true},
     events = {'GroupSelected'},
     actions = {{name = 'Actions', slots = 2, type = 'any'}}}
@@ -73,7 +73,7 @@ stopEvents();stopEvents();check(eventStops==1)
 -- Exercise the actual text loader with a real file and a restricted environment.
 local path = 'work/loader-fixture.lua'
 local file = assert(io.open(path, 'wb'))
-file:write('return {collection="Loader",name="Loaded",category="player.stats",settings={target="templates",enabled=false},render=function() return token end}')
+file:write('return {name="Loaded",category="player.stats",settings={target="templates",enabled=false},render=function() return token end}')
 file:close()
 local actual = TE.new({listFiles = function() return {path} end, environment = function() return {token = 17} end})
 check(actual:loadTemplatesFromRegister() == 1)
