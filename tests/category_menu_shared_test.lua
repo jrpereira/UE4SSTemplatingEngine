@@ -29,6 +29,14 @@ local vertical = menu.definitions['player.quickslots'][choices[2]]
 assert(bottom.access == vertical.access)
 assert(bottom.direct['1'][1].key == vertical.direct['1'][1].key)
 assert(bottom.advanced['1'][1].key == vertical.advanced['1'][1].key)
+for _, sectionId in ipairs({'TE_PlayerQuickslotsShared', 'TE_PlayerQuickslotsAbilities',
+    'TE_PlayerQuickslotsConsumables', 'TE_PlayerQuickslotsGroups'}) do
+    local section = assert(menu.fullManifest:match('%[Category%.' .. sectionId .. '%]([^[]+)'))
+    for _, choice in ipairs(choices) do
+        assert(section:find(tostring(choice) .. ':', 1, true),
+            sectionId .. ' lacks label for template value ' .. choice)
+    end
+end
 
 local rows, values, accessIndex = {}, {}, nil
 for index, row in ipairs(menu.rows) do
@@ -38,6 +46,8 @@ for index, row in ipairs(menu.rows) do
     if row.Id == bottom.access then accessIndex = index end
 end
 assert(accessIndex and rows[bottom.direct['1'][1].key] > accessIndex)
+assert(menu.rows[rows[bottom.direct['1'][1].key]].Label == 'Slot 1')
+assert(menu.rows[rows[bottom.direct['2'][1].key]].Label == 'Slot 1')
 values[bottom.access] = 2
 values[bottom.direct['1'][1].key] = 77
 values[bottom.advanced['1'][1].key] = 78

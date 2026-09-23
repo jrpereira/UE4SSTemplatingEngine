@@ -111,13 +111,22 @@ function M.generate(registry, options)
             ammType = compact and #values <= 8 and 'tab' or nil,
             ammTabsWidth = compact and #values <= 8 and tabsWidth or nil})
     end
-    local function group(identity, label, selector, selected, source, visible, level, heading, publicId)
+    local function group(identity, label, selector, selected, source, visible, level, heading, publicId,
+        labelValues)
         local groupId = publicId and namedId(publicId, {'group', identity}) or id({'group', identity})
         if not groups[groupId] then
             groups[groupId] = true
+            local labels = {}
+            if labelValues then
+                for index = 2, #labelValues do
+                    labels[#labels + 1] = tostring(labelValues[index]) .. ':' .. text(label)
+                end
+            else
+                labels[1] = tostring(selected) .. ':' .. text(label)
+            end
             local fields = {VisibleWhen = source, VisibleValues = visible,
                 ammLevel = level or 3, ammHeading = heading, ammLabelWhen = selector,
-                ammLabels = tostring(selected) .. ':' .. text(label)}
+                ammLabels = table.concat(labels, ';')}
             groupSections[groupId] = fields
             groupOrder[#groupOrder + 1] = groupId
             emit('Category.' .. groupId, fields)
@@ -206,7 +215,7 @@ function M.generate(registry, options)
                 local groupId = group(key({category, 'category_provider', providerGroup.id}),
                     providerGroup.label, selector, values[2], selector, visibleValues,
                     providerGroup.level, providerGroup.heading == false and 0 or nil,
-                    publicName(category) .. publicName(providerGroup.id))
+                    publicName(category) .. publicName(providerGroup.id), categorySingle and values or nil)
                 for _, field in ipairs(providerGroup.fields) do
                     local settingId = namedId(publicName(category) .. publicName(field.id),
                         {'category_provider', category, field.id})
@@ -250,7 +259,7 @@ function M.generate(registry, options)
                     maxSlots = math.max(maxSlots, g.slots)
                     local directGroup = group(key({category, 'direct', g.name}), g.name,
                         selector, values[2], access, 1, 5, nil,
-                        publicName(category) .. publicName(g.name))
+                        publicName(category) .. publicName(g.name), values)
                     sharedQuickslots.direct[item.key] = {}
                     for slot = 1, g.slots do
                         slotIndex = slotIndex + 1
@@ -259,14 +268,14 @@ function M.generate(registry, options)
                         local slotName = g.slotNames and g.slotNames[slot] or tostring(slot)
                         sharedQuickslots.direct[item.key][slot] = sharedBinding(
                             key({category, 'direct', g.type, slotName}),
-                            'Slot ' .. slotIndex .. ' (' .. g.type .. ')', directGroup,
+                            'Slot ' .. slot, directGroup,
                             publicName(category) .. publicName(g.type) .. publicName(slotName),
                             quickslotDefaults.slots[nativeSlot], defaultMode)
                     end
                 end
                 local activateGroup = group(key({category, 'groups'}), 'Groups',
                     selector, values[2], access, 0, nil, nil,
-                    publicName(category) .. 'Groups')
+                    publicName(category) .. 'Groups', values)
                 for index, item in ipairs(ordered) do
                     local g = item.value
                     local modes = index == 1 and {0, 2, -1} or {0, 2}
@@ -277,7 +286,7 @@ function M.generate(registry, options)
                 end
                 local sharedGroup = group(key({category, 'slots'}), 'Slots',
                     selector, values[2], access, 0, nil, nil,
-                    publicName(category) .. 'Slots')
+                    publicName(category) .. 'Slots', values)
                 for slot = 1, maxSlots do
                     sharedQuickslots.shared[slot] = sharedBinding(
                         key({category, 'shared', slot}), 'Slot ' .. slot, sharedGroup,
@@ -286,7 +295,7 @@ function M.generate(registry, options)
                 end
                 local advancedGroup = group(key({category, 'advanced'}), 'Group Keys Per Slot',
                     selector, values[2], access, 2, nil, nil,
-                    publicName(category) .. 'Advanced')
+                    publicName(category) .. 'Advanced', values)
                 for _, item in ipairs(ordered) do
                     local g = item.value
                     sharedQuickslots.advanced[item.key] = {}
@@ -386,7 +395,7 @@ function M.generate(registry, options)
                             local nativeSlot = ((slotIndex - 1) % 4) + 1
                             local defaultMode = slotIndex > 4 and slotModes[2] or slotModes[1]
                             definition.direct[item.key][slot] = binding(key({identity, 'direct', g.name, slot}),
-                                'Slot ' .. slotIndex .. ' (' .. g.type .. ')', directGroup, nil, nil, slotModes,
+                                'Slot ' .. slot, directGroup, nil, nil, slotModes,
                                 scopePrefix .. 'Slot' .. slotIndex, quickslotDefaults.slots[nativeSlot], defaultMode)
                         end
                     end

@@ -103,8 +103,8 @@ for _, last in ipairs({2, 5}) do
         previous = item.group
     end
     check(blocks == 1)
-    check(model.items[indices[definition.direct['1'][1].key]].label == 'Slot 1 (consumables)')
-    check(model.items[indices[definition.direct['2'][1].key]].label == 'Slot 5 (abilities)')
+    check(model.items[indices[definition.direct['1'][1].key]].label == 'Slot 1')
+    check(model.items[indices[definition.direct['2'][1].key]].label == 'Slot 1')
     check(model.items[indices[definition.shared[1].key]].label == 'Slot 1')
     local function visibleKeys()
         local visibility, count = model:visibility(), 0
