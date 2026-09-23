@@ -443,6 +443,11 @@ function M.generate(registry, options)
     end
     local function providerManifest(providerId, providerName, selectedRows, aggregatePage)
         local output = {}
+        local headerPickers = 0
+        for _, item in ipairs(selectedRows) do
+            if item.ammLevel == 1 then headerPickers = headerPickers + 1 end
+        end
+        assert(headerPickers <= 1, providerName .. ': only one level-1 picker per page')
         append(output, 'Mod', {Id=providerId, Name=providerName, Version='0.0.18',
             Description=options.description and text(options.description) or nil})
         local usedGroups, visibleGroups, hiddenByGroup = {}, {}, {}
