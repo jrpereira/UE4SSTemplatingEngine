@@ -37,6 +37,8 @@ for _, sectionId in ipairs({'TE_PlayerQuickslotsShared', 'TE_PlayerQuickslotsAbi
             sectionId .. ' lacks label for template value ' .. choice)
     end
 end
+local sharedSection = assert(menu.fullManifest:match('%[Category%.TE_PlayerQuickslotsShared%]([^[]+)'))
+assert(sharedSection:find('ammHeading=0', 1, true))
 
 local rows, values, accessIndex = {}, {}, nil
 for index, row in ipairs(menu.rows) do

@@ -24,6 +24,7 @@ local category = {
        },
 
     settings = {
+        groups = {{ id = "Shared", label = "Shared", level = 4, heading = false }},
         fields = {
             { id = "AccessMode", type = "picker", label = "Input Keys", description = "Choose between more keys vs more combinations",
               values = { 0, 1, 2 }, labels = { "Grouped", "Individual", "Advanced" }, default = 0,
