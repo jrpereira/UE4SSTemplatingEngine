@@ -53,7 +53,7 @@ local shared = assert(category:attach(service, switcher, {}, plain,
 assert(shared.primary == second and shared.secondary == first and shared.moved)
 assert(switcher:GetChildrenCount() == 1 and owner.children[2] == first)
 assert(category:attach(service, switcher, {}, shared, {detachSecondaryWheel=true}) == shared)
-assert(category:attach(service, switcher, {settings={PrimaryWheel=1}}, shared,
+assert(category:attach(service, switcher, {PrimaryWheel=1}, shared,
     {detachSecondaryWheel=true}) == shared)
 assert(shared.primary == first and shared.secondary == second
     and switcher:GetChildAt(0) == first and owner.children[2] == second)

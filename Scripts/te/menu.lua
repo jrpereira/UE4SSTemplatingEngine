@@ -149,6 +149,7 @@ function M.generate(registry, options)
     local function storageIdentity(entry) return entry.id end
     local decoded = {}
     local categorySettings = {}
+    local textSettings = {}
     for _, category in ipairs(registry.categories:list()) do
         local categoryLabel = (options.categoryLabels or {})[category]
             or title(category:gsub('%.', ' '))
@@ -190,10 +191,16 @@ function M.generate(registry, options)
                 multiSelectors[category] = {}
             end
             decoded[category] = {}
-            local categoryGroups, staticSettings = Provider.normalizeCategory(
+            local categoryGroups, staticSettings, staticFormats = Provider.normalizeCategory(
                 registry.categories:getCategory(category).settings)
-            local sharedFields = {}
-            categorySettings[category] = {fields=sharedFields, static=staticSettings}
+            local sharedFields, textIds = {}, {}
+            categorySettings[category] = {fields=sharedFields, static=staticSettings, textIds=textIds}
+            for field, default in pairs(staticSettings) do
+                local settingId = namedId(publicName(category) .. publicName(field),
+                    {'category_text', category, field})
+                textIds[field] = settingId
+                textSettings[settingId] = {default=default, format=staticFormats[field]}
+            end
             local visibleValues = categorySingle and table.concat(values, '|', 2) or nil
             for _, providerGroup in ipairs(categoryGroups) do
                 local groupId = group(key({category, 'category_provider', providerGroup.id}),
@@ -473,20 +480,25 @@ function M.generate(registry, options)
         local result = {}
         local function readBinding(pair) return {key = effective[pair.key], mode = effective[pair.mode]} end
         local function readSelection(definition, category)
-            local selection = {configuration = {}}
+            local selection = {settings = {}}
             if not definition then return selection end
             selection.id = definition.id
-            local config = selection.configuration
+            local config = selection.settings
             local shared = categorySettings[category]
             if shared then
-                config.categorySettings = U.copy(shared.static)
-                for field, settingId in pairs(shared.fields) do
-                    config.categorySettings[field] = effective[settingId]
+                for field, default in pairs(shared.static) do
+                    local supplied = values[shared.textIds[field]]
+                    config[field] = supplied == nil and default or supplied
                 end
+                for field, settingId in pairs(shared.fields) do
+                    config[field] = effective[settingId]
+                end
+                Provider.validateCategory(registry.categories:getCategory(category).settings, config)
             end
             if definition.settings then
-                config.settings = {}
-                for field, settingId in pairs(definition.settings) do config.settings[field] = effective[settingId] end
+                for field, settingId in pairs(definition.settings) do
+                    config[field] = effective[settingId]
+                end
             end
             if definition.access then
                 local selectedAccess = effective[definition.access]
@@ -612,6 +624,7 @@ function M.generate(registry, options)
     end
     return {manifest = aggregateManifest, fullManifest = table.concat(lines, '\n'), catalog = catalog,
         rows = rows, selectors = selectors, multiSelectors=multiSelectors, definitions = decoded, warnings = warnings,
+        textSettings = textSettings,
         decode = makeDecoder(rows, allCategories), aggregate=aggregate, pages=pages,
         pageByCategory=pageByCategory, pageByModule=pageByModule, providers=providers}
 end

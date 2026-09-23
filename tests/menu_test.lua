@@ -131,8 +131,8 @@ for _, last in ipairs({2, 5}) do
     check(visibleKeys() == 3 + math.max(4, last))
     local values = {}; for i, item in ipairs(model.items) do values[item.id] = model.pending[i] end
     local decoded = result.decode(values)['player.quickslots']
-    check(decoded.id == selector.byValue[selected] and not decoded.configuration.firstGroupDefault)
-    check(#decoded.configuration.shared == math.max(4, last))
+    check(decoded.id == selector.byValue[selected] and not decoded.settings.firstGroupDefault)
+    check(#decoded.settings.shared == math.max(4, last))
     values[selector.id] = 0
     check(result.decode(values)['player.quickslots'].id == nil)
     values[definition.shared[1].key] = 255

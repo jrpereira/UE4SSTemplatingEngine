@@ -126,18 +126,46 @@ function M.new(registry, options)
             return detach(category, context, reason or 'disable')
         end)
     end
-    local function apply(category, identity, configuration, context, suppliedTarget, stateKey)
+    local function apply(category, identity, settings, context, suppliedTarget, stateKey)
             local slot = stateKey or category
             assert(registry.categories:contains(category), 'unregistered category: ' .. tostring(category))
             if identity == nil then return detach(category, context, 'none', stateKey) end
             local entry = assert(registry.byId[identity], 'unknown template identity')
             assert(entry.template.category == category, 'template category mismatch')
             V.template(entry.template, registry.categories, entry.location, enabled(entry.template))
-            assert(type(configuration) == 'table', 'committed configuration must be a table')
-            local spec = U.copy(configuration)
-            Provider.validateCategory(registry.categories:getCategory(category).settings,
-                spec.categorySettings)
-            Provider.validate(entry.template.settings, spec.settings)
+            assert(type(settings) == 'table', 'committed settings must be a table')
+            local spec = U.copy(settings)
+            local declared, own = {}, {}
+            for _, group in ipairs(Provider.normalize(entry.template.settings)) do
+                for _, field in ipairs(group.fields) do
+                    declared[field.id] = true
+                    own[field.id] = spec[field.id]
+                end
+            end
+            Provider.validate(entry.template.settings, next(declared) and own or nil)
+            local categoryDeclaration = registry.categories:getCategory(category).settings
+            local categoryGroups, static = Provider.normalizeCategory(categoryDeclaration)
+            local categoryValues, categoryFields = {}, {}
+            for _, group in ipairs(categoryGroups) do
+                for _, field in ipairs(group.fields) do
+                    categoryFields[field.id] = true
+                    categoryValues[field.id] = declared[field.id] and field.default or spec[field.id]
+                end
+            end
+            for field, default in pairs(static) do
+                categoryFields[field] = true
+                categoryValues[field] = declared[field] and default or spec[field]
+            end
+            Provider.validateCategory(categoryDeclaration,
+                next(categoryFields) and categoryValues or nil)
+            if next(declared) then
+                local generated = category == 'player.quickslots' and
+                    {access=true,firstGroupDefault=true,direct=true,groups=true,shared=true,advanced=true} or {}
+                for name in pairs(spec) do
+                    assert(declared[name] or categoryFields[name] or generated[name],
+                        'unknown provider setting ' .. tostring(name))
+                end
+            end
             local previous = self.active[slot]
             if not enabled(entry.template) then
                 if previous and previous.id ~= identity then
@@ -145,20 +173,20 @@ function M.new(registry, options)
                     if not ok then return nil, err end
                 end
                 self.pending[slot]=nil
-                self.active[slot]={id=identity,template=entry.template,configuration=spec,suppressed=true}
+                self.active[slot]={id=identity,template=entry.template,settings=spec,suppressed=true}
                 return true, 'disabled'
             end
             if category=='menu.fixes' and entry.template.attach==nil
                 and entry.template.detach==nil and entry.template.render==nil then
                 self.pending[slot]=nil
-                self.active[slot]={id=identity,template=entry.template,configuration=spec,inert=true}
+                self.active[slot]={id=identity,template=entry.template,settings=spec,inert=true}
                 return true
             end
             -- Validate before releasing an old attachment, then resolve freshly for each call.
             local service = resolveService(category, context)
             local target = resolveTarget(category, context, suppliedTarget, service)
             if Events.requiresTarget(category) and not service:valid(target) then
-                self.pending[slot] = {id=identity, template=entry.template, configuration=spec}
+                self.pending[slot] = {id=identity, template=entry.template, settings=spec}
                 return true, 'not_ready'
             end
             if previous and previous.suppressed then self.active[slot]=nil;previous=nil end
@@ -173,7 +201,7 @@ function M.new(registry, options)
                     local shared = self.categoryHandles[category]
                     if definition.attach then
                         local ok, restored, why = pcall(definition.attach, definition, service, target,
-                            U.copy(previous.configuration), shared and shared.handle or nil, previous.template)
+                            U.copy(previous.settings), shared and shared.handle or nil, previous.template)
                         if not ok or restored == nil or restored == false then
                             return nil, tostring(failure) .. '; category restoration failed: '
                                 .. tostring(ok and why or restored)
@@ -182,7 +210,7 @@ function M.new(registry, options)
                         shared = self.categoryHandles[category]
                     end
                     local ok, restored, why = pcall(previous.template.attach, previous.template,
-                        service, target, U.copy(previous.configuration), previous.handle,
+                        service, target, U.copy(previous.settings), previous.handle,
                         shared and shared.handle or nil)
                     if not ok or restored == nil or restored == false then
                         return nil, tostring(failure) .. '; template restoration failed: '
@@ -205,7 +233,7 @@ function M.new(registry, options)
                 if (handle == nil or handle == false) and err == 'not_ready' then
                     local _, why = recover('not_ready')
                     if why ~= 'not_ready' then return nil, why end
-                    self.pending[slot] = {id=identity, template=entry.template, configuration=spec}
+                    self.pending[slot] = {id=identity, template=entry.template, settings=spec}
                     return true, 'not_ready'
                 end
                 if handle == nil or handle == false then
@@ -222,19 +250,19 @@ function M.new(registry, options)
             if (handle == nil or handle == false) and err == 'not_ready' then
                 local _, why = recover('not_ready')
                 if why ~= 'not_ready' then return nil, why end
-                self.pending[slot] = {id=identity, template=entry.template, configuration=spec}
+                self.pending[slot] = {id=identity, template=entry.template, settings=spec}
                 return true, 'not_ready'
             end
             if handle == nil or handle == false then
                 return recover(err or 'attach returned no handle')
             end
             self.pending[slot] = nil
-            self.active[slot] = {id = identity, template = entry.template, handle = handle, configuration = spec}
+            self.active[slot] = {id = identity, template = entry.template, handle = handle, settings = spec}
             return true
     end
-    function self:apply(category, identity, configuration, context)
+    function self:apply(category, identity, settings, context)
         return guarded(function()
-            return apply(category, identity, configuration, context)
+            return apply(category, identity, settings, context)
         end)
     end
     function self:retry(category, context)
@@ -244,7 +272,7 @@ function M.new(registry, options)
                 for _, stateKey in pairs(states) do
                     local pending = self.pending[stateKey]
                     if pending then
-                        local ok, why = apply(category, pending.id, pending.configuration, context, nil, stateKey)
+                        local ok, why = apply(category, pending.id, pending.settings, context, nil, stateKey)
                         if not ok or why == 'not_ready' then return ok, why end
                     end
                 end
@@ -252,7 +280,7 @@ function M.new(registry, options)
             end
             local pending = self.pending[category]
             if not pending then return true end
-            return apply(category, pending.id, pending.configuration, context)
+            return apply(category, pending.id, pending.settings, context)
         end)
     end
     local function renderRecord(category, current, context, target, reason)
@@ -287,7 +315,7 @@ function M.new(registry, options)
             registry.categories:getCategory(category).events) then return 'ignored' end
         if desired.suppressed or not enabled(desired.template) then return 'ignored' end
         if self.pending[stateKey] then
-            local attached, why = apply(category, desired.id, desired.configuration, context, nil, stateKey)
+            local attached, why = apply(category, desired.id, desired.settings, context, nil, stateKey)
             if not attached then return nil, why end
             if why == 'not_ready' then return 'not_ready' end
         end
@@ -315,7 +343,7 @@ function M.new(registry, options)
                 registry.categories:getCategory(category).events) then return 'ignored' end
             if desired.suppressed or not enabled(desired.template) then return 'ignored' end
             if self.pending[category] then
-                local attached, why = apply(category, desired.id, desired.configuration, context)
+                local attached, why = apply(category, desired.id, desired.settings, context)
                 if not attached then return nil, why end
                 if why == 'not_ready' then return 'not_ready' end
             end
@@ -336,14 +364,14 @@ function M.new(registry, options)
             local selections = {}
             for identity, stateKey in pairs(states) do
                 local current = self.pending[stateKey] or self.active[stateKey]
-                if current then selections[#selections + 1] = {id=identity, configuration=U.copy(current.configuration)} end
+                if current then selections[#selections + 1] = {id=identity, settings=U.copy(current.settings)} end
             end
             table.sort(selections, function(a, b) return a.id < b.id end)
             return selections
         end
         local current = self.pending[category] or self.active[category]
         if not current then return nil end
-        return current.id, U.copy(current.configuration)
+        return current.id, U.copy(current.settings)
     end
     -- Use this only for an already durable Apply event, never staged picker changes.
     -- A batch can partially succeed across categories: expose every failure for retry.
@@ -365,8 +393,8 @@ function M.new(registry, options)
         local errors = {}
         for _, category in ipairs(names) do
             local selection = selections[category]
-            if selection.id ~= nil or selection.configuration ~= nil then
-                local ok, err = self:apply(category, selection.id, selection.configuration or {}, context)
+            if selection.id ~= nil or selection.settings ~= nil then
+                local ok, err = self:apply(category, selection.id, selection.settings or {}, context)
                 if not ok then errors[category] = err end
             else
                 local partial, known = selection._partial == true, selection._known
@@ -398,7 +426,7 @@ function M.new(registry, options)
                     if not errors[category .. ':' .. identity] then
                         local stateKey = states[identity] or (category .. '\0' .. identity)
                         local ok, err = guarded(function()
-                            return apply(category, identity, item.configuration or {}, context, nil, stateKey)
+                            return apply(category, identity, item.settings or {}, context, nil, stateKey)
                         end)
                         if not ok then errors[category .. ':' .. identity] = err else states[identity] = stateKey end
                     end

@@ -73,7 +73,7 @@ check(runtime:apply('player.quickslots', nil, {}, context))
 check(runtime:selection('player.quickslots') == nil and calls[#calls] == 'B:detach:none')
 before = #calls
 check(runtime:detach('player.quickslots', context, 'disable') and #calls == before)
-local function decode(values) return {['player.quickslots'] = {id = a, configuration = values}} end
+local function decode(values) return {['player.quickslots'] = {id = a, settings = values}} end
 check(runtime:commit({revision = 1, values = {value = 10}}, decode, context))
 before = #calls
 check(runtime:commit({revision = 1, values = {value = 11}}, decode, context) and #calls == before)
@@ -120,12 +120,12 @@ local multiRegistry=Registry.new(multiCategories,{execute=function()return multi
 multiRegistry:registerTemplate('multi.lua');multiRegistry:loadTemplatesFromRegister()
 local firstId,secondId=multiRegistry.templates[1].id,multiRegistry.templates[2].id
 local multiRuntime=Lifecycle.new(multiRegistry)
-local desired={{id=firstId,configuration={}},{id=secondId,configuration={}}}
+local desired={{id=firstId,settings={}},{id=secondId,settings={}}}
 check(multiRuntime:commit({revision=1,values={}},function()return {['menu.fixes']=desired}end,{}))
 local selected=multiRuntime:selection('menu.fixes')
 check(#selected==2 and multiRuntime:render('menu.fixes',{},nil,'test')=='ignored')
 check(multiRuntime:commit({revision=2,values={}},function()
-    return {['menu.fixes']={{id=secondId,configuration={}}}}
+    return {['menu.fixes']={{id=secondId,settings={}}}}
 end,{}))
 selected=multiRuntime:selection('menu.fixes')
 check(#selected==1 and selected[1].id==secondId)

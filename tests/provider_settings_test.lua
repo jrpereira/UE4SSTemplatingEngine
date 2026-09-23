@@ -63,15 +63,15 @@ model:set(index[provider.WheelsDisplayed],1)
 local visibility=model:visibility()
 for _, settingId in pairs(provider) do check(visibility[index[settingId]]) end
 local values={}; for i,item in ipairs(items) do values[item.id]=model.pending[i] end
-local spec=menu.decode(values)['player.quickslots'].configuration
-check(spec.settings.WheelsDisplayed==1 and spec.settings.PrimaryWheel==0)
-for id, expected in pairs(defaults) do check(spec.settings[id]==expected) end
-spec.settings.SecondaryX=900
-check(menu.decode(values)['player.quickslots'].configuration.settings.SecondaryX==40)
+local spec=menu.decode(values)['player.quickslots'].settings
+check(spec.WheelsDisplayed==1 and spec.PrimaryWheel==0)
+for id, expected in pairs(defaults) do check(spec[id]==expected) end
+spec.SecondaryX=900
+check(menu.decode(values)['player.quickslots'].settings.SecondaryX==40)
 local context={playerActions=dofile('tests/support/service.lua')(),targets={['player.quickslots']={}}}
-local invalidSpec=U.copy(spec);invalidSpec.settings.PrimaryX=1001
+local invalidSpec=U.copy(spec);invalidSpec.PrimaryX=1001
 check(not te.runtime:apply('player.quickslots',menu.definitions['player.quickslots'][value].id,invalidSpec,context))
-invalidSpec=U.copy(spec);invalidSpec.settings.Unexpected=1
+invalidSpec=U.copy(spec);invalidSpec.Unexpected=1
 check(not te.runtime:apply('player.quickslots',menu.definitions['player.quickslots'][value].id,invalidSpec,context))
 check(te.runtime:commit({revision=1,values=values},menu.decode,context))
 local handle=te.runtime.active['player.quickslots'].handle
@@ -79,7 +79,7 @@ values[provider.SecondaryX]=75
 check(te.runtime:commit({revision=2,values=values},menu.decode,context))
 check(attaches==2 and te.runtime.active['player.quickslots'].handle==handle)
 local _, committed=te.runtime:selection('player.quickslots')
-check(committed.settings.SecondaryX==75)
+check(committed.SecondaryX==75)
 check(committed.shared[1].key==spec.shared[1].key and committed.access==spec.access)
 values[provider.PrimarySize]=201
 rejects(function() menu.decode(values) end,'invalid integer')

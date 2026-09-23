@@ -1,4 +1,5 @@
 local U = require('te.util')
+local QuickslotLayout = require('te.quickslot_layout')
 local M = {}
 local function finite(v) return type(v) == 'number' and v == v and math.abs(v) <= 1000000000 end
 local function text(v, where)
@@ -124,9 +125,9 @@ function M.validate(declaration, committed)
 end
 
 -- Category settings are shared by every template in that category. DMM can
--- edit numeric fields; text defaults remain available to the category code.
+-- edit numeric fields; text values can be edited in config.ini.
 function M.normalizeCategory(declaration)
-    if declaration == nil then return {}, {} end
+    if declaration == nil then return {}, {}, {} end
     assert(type(declaration) == 'table', 'category settings must be a table')
     allowed(declaration, {groups=true,fields=true}, 'category settings')
     local declaredGroups = declaration.groups or {}
@@ -136,28 +137,38 @@ function M.normalizeCategory(declaration)
     local groups = #declaredGroups > 0 and U.copy(declaredGroups)
         or {{id='Shared', label='Shared', level=4}}
     local defaultGroup = groups[1].id
-    local numeric, static, seen = {}, {}, {}
+    local numeric, static, formats, seen = {}, {}, {}, {}
     for _, source in ipairs(declaredFields) do
         assert(type(source) == 'table', 'category field must be a table')
         identifier(source.id, 'category field id')
         assert(not seen[source.id], 'duplicate category field ' .. source.id)
         seen[source.id] = true
         if source.type == 'text' then
-            allowed(source, {id=true,type=true,default=true,order=true}, 'category text field')
+            allowed(source, {id=true,type=true,default=true,order=true,format=true}, 'category text field')
             assert(type(source.default) == 'string', 'category text default must be a string')
+            M.validateText(source.format, source.default)
             static[source.id] = source.default
+            formats[source.id] = source.format or false
         else
             local field = U.copy(source)
             field.group = field.group or defaultGroup
             numeric[#numeric + 1] = field
         end
     end
-    if #numeric == 0 then return {}, static end
-    return M.normalize({enabled=true,target='templates',groups=groups,fields=numeric}), static
+    if #numeric == 0 then return {}, static, formats end
+    return M.normalize({enabled=true,target='templates',groups=groups,fields=numeric}), static, formats
+end
+
+function M.validateText(format, value)
+    assert(type(value) == 'string' and #value > 0 and #value <= 4096
+        and not value:find('[%c;#]'), 'invalid category text setting')
+    if format == 'quickslot_layout' then QuickslotLayout.parse(value)
+    else assert(format == nil or format == false, 'unsupported category text format') end
+    return value
 end
 
 function M.validateCategory(declaration, committed)
-    local groups, static = M.normalizeCategory(declaration)
+    local groups, static, formats = M.normalizeCategory(declaration)
     local expected = {}
     for _, group in ipairs(groups) do
         for _, field in ipairs(group.fields) do
@@ -176,13 +187,14 @@ function M.validateCategory(declaration, committed)
     end
     for name, default in pairs(static) do
         expected[name] = true
-        assert(type(committed) == 'table' and committed[name] == default,
-            'invalid category text setting ' .. name)
+        assert(type(committed) == 'table', 'missing category text setting ' .. name)
+        M.validateText(formats[name], committed[name])
     end
     if next(expected) == nil and committed == nil then return nil end
     assert(type(committed) == 'table', 'committed category settings are required')
     for name in pairs(committed) do assert(expected[name], 'unknown category setting ' .. tostring(name)) end
     return committed
 end
+
 
 return M

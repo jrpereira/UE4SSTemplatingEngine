@@ -8,12 +8,12 @@ local deferCategory, failTemplate, failMode = false, false, nil
 local categories = Categories.new()
 categories:registerCategory('demo', {'feature'})
 categories:setCategory('demo.feature', {
-    attach=function(self, service, target, configuration, previous, template)
+    attach=function(self, service, target, settings, previous, template)
         calls[#calls+1]='category:attach:'..template.name
-        assert(service == target.service and configuration.value == 3)
+        assert(service == target.service and settings.value == 3)
         if deferCategory then return nil, 'not_ready' end
         local handle = previous or {reference=target.reference}
-        handle.mode = configuration.mode
+        handle.mode = settings.mode
         return handle
     end,
     detach=function(self, service, handle, reason)
@@ -24,10 +24,10 @@ categories:setCategory('demo.feature', {
 })
 local function template(name)
     return {name=name, category='demo.feature', settings={target='templates',enabled=true},
-        attach=function(self, service, target, configuration, previous, shared)
+        attach=function(self, service, target, settings, previous, shared)
             calls[#calls+1]=name..':attach'
             assert(shared and shared.reference == service.reference)
-            if failTemplate or (failMode ~= nil and configuration.mode == failMode) then
+            if failTemplate or (failMode ~= nil and settings.mode == failMode) then
                 return nil, 'template failure'
             end
             return previous or {name=name}
@@ -75,6 +75,6 @@ failMode = 2
 local reapplied, why = runtime:apply('demo.feature', a, {value=3,mode=2}, context)
 assert(not reapplied and why == 'template failure')
 assert(runtime.active['demo.feature'].handle == original
-    and runtime.active['demo.feature'].configuration.mode == 1
+    and runtime.active['demo.feature'].settings.mode == 1
     and runtime.categoryHandles['demo.feature'].handle.mode == 1)
 print('category lifecycle: direct hooks, shared handle, switch and cleanup passed')

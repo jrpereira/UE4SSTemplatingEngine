@@ -55,7 +55,7 @@ local service = {
     activateQuickslot=function(_,kind,slot) calls[#calls+1]=kind..':'..slot;return true end,
     selectQuickslotGroup=function(_,index) calls[#calls+1]='group:'..index;return true end,
 }
-assert(host:apply({category='player.quickslots'}, {settings={PrimaryWheel=1}}, service))
+assert(host:apply({category='player.quickslots'}, {PrimaryWheel=1}, service))
 assert(commits == 1)
 local activeCallback = callback
 activeCallback(plan.actions[3], 'Triggered')

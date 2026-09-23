@@ -10,7 +10,7 @@ local template = {
     },
 }
 
-local direct = Plan.build(template, {access = 0, settings={PrimaryWheel=1}, direct = {
+local direct = Plan.build(template, {access = 0, PrimaryWheel=1, direct = {
     ['1'] = {{key=49,mode=0},{key=50,mode=1},{key=51,mode=0},{key=52,mode=1}},
     ['2'] = {{key=49,mode=0},{key=50,mode=1},{key=51,mode=0},{key=52,mode=1}},
 }})
@@ -19,7 +19,7 @@ for slot = 1, 4 do
     check(direct.actions[slot].id == 'IA_ActionSlot' .. slot and direct.actions[slot].type == 'ability')
     check(direct.actions[slot + 4].id == 'IA_ActionSlot' .. (slot + 4) and direct.actions[slot + 4].type == 'consumable')
 end
-local consumableFirst = Plan.build(template, {access = 0, settings={PrimaryWheel=0}, direct = {
+local consumableFirst = Plan.build(template, {access = 0, PrimaryWheel=0, direct = {
     ['1'] = {{key=49,mode=0},{key=50,mode=1},{key=51,mode=0},{key=52,mode=1}},
     ['2'] = {{key=49,mode=0},{key=50,mode=1},{key=51,mode=0},{key=52,mode=1}},
 }})

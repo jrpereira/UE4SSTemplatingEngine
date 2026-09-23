@@ -1,6 +1,7 @@
 -- Explicit menu-testing host. No input mapping, native discovery or visual hooks.
 local Boot = require('te.menu_boot')
 local ObjectPaths = require('te.object_paths')
+local Provider = require('te.provider_settings')
 local M = {}
 local legacyQuickslots = {TE_PlayerQuickslotsAccessMode='TE_AccessMethod',
     TE_PlayerQuickslotsGroupAbility='TE_Group1',
@@ -22,7 +23,7 @@ local function read(path)
     local file = assert(io.open(path, 'rb'), 'missing installed file: ' .. path)
     local content = file:read('*a'); file:close(); return content
 end
-local function ensureConfig(path, rows)
+local function ensureConfig(path, rows, textSettings)
     local file = io.open(path, 'rb')
     local existed = file ~= nil
     local content = file and file:read('*a') or ''
@@ -83,6 +84,16 @@ local function ensureConfig(path, rows)
             end
         end
     end
+    for settingId, spec in pairs(textSettings or {}) do
+        local index = present[settingId]
+        if not index then
+            missing[#missing + 1] = settingId .. '=' .. spec.default
+        else
+            local raw = lines[index]:match('=%s*([^;#]*)')
+            Provider.validateText(spec.format, raw and raw:match('^%s*(.-)%s*$'))
+        end
+    end
+    table.sort(missing)
     if #missing == 0 and not changed then return false end
     if not first then
         if #lines > 0 and lines[#lines] ~= '' then lines[#lines + 1] = '' end
@@ -108,7 +119,7 @@ local function ensureConfig(path, rows)
     end
     return true
 end
-local function readConfigValues(path)
+local function readConfigValues(path, textSettings)
     local file = assert(io.open(path, 'rb'), 'missing installed config: ' .. path)
     local content = file:read('*a'); file:close()
     local values, section = {}, nil
@@ -116,11 +127,16 @@ local function readConfigValues(path)
         local heading = line:match('^%s*%[([^%]]+)%]%s*$')
         if heading then section = heading
         elseif section == 'Templates' then
-            local key, value = line:match('^%s*([^=;#]+)%s*=%s*([^;#]+)')
+            local key, value = line:match('^%s*([^=;#]+)%s*=%s*([^;#]*)')
             if key then
-                key, value = key:match('^%s*(.-)%s*$'), tonumber(value:match('^%s*(.-)%s*$'))
-                assert(value ~= nil, 'invalid numeric Templates setting: ' .. key)
-                values[key] = value
+                key, value = key:match('^%s*(.-)%s*$'), value:match('^%s*(.-)%s*$')
+                if textSettings and textSettings[key] then
+                    values[key] = Provider.validateText(textSettings[key].format, value)
+                else
+                    value = tonumber(value)
+                    assert(value ~= nil, 'invalid numeric Templates setting: ' .. key)
+                    values[key] = value
+                end
             end
         end
     end
@@ -134,7 +150,9 @@ function M.start(root, settings, queue, log)
                 return context.targets[category]
             end
         end})
-    if ensureConfig(root .. '/config.ini', menu.rows) then log('Added defaults for new template settings.') end
+    if ensureConfig(root .. '/config.ini', menu.rows, menu.textSettings) then
+        log('Added defaults for new template settings.')
+    end
     service = {}
     function service:valid(object)
         if object == nil then return false end
@@ -197,27 +215,34 @@ function M.start(root, settings, queue, log)
     end
     inputHost = require('te.player_actions.ue4ss_host').new(queue, log,
         te.categories:getCategory('player.quickslots'))
-    local initial = menu.decode(readConfigValues(root .. '/config.ini'))['player.quickslots']
+    local initial = menu.decode(readConfigValues(root .. '/config.ini', menu.textSettings))['player.quickslots']
     if initial and initial.id then
         local template = assert(te.registry.byId[initial.id], 'persisted Quickslots template is unavailable').template
-        local bound, why = inputHost:apply(template, initial.configuration, service)
+        local bound, why = inputHost:apply(template, initial.settings, service)
         if bound then log('Persisted Quickslots template input is active.')
         else log('Persisted Quickslots template input pending: ' .. tostring(why)) end
     else
         inputHost:deactivate()
     end
     local routed = {subscribe=function(provider, callback)
-        return settings.subscribe(provider, function(event) queue(function() callback(event) end) end)
+        return settings.subscribe(provider, function(event) queue(function()
+            local values = {}
+            for key, value in pairs(event.values) do values[key] = value end
+            local current = readConfigValues(root .. '/config.ini', menu.textSettings)
+            for settingId in pairs(menu.textSettings) do values[settingId] = current[settingId] end
+            callback({providerId=event.providerId, revision=event.revision,
+                values=values, changes=event.changes})
+        end) end)
     end}
     te:subscribeApplied(routed, menu, function()
         return {playerActions=service, services={['menu.templates']={}}}
     end, function(ok, errors)
         if ok then
-            local id, configuration = te.runtime:selection('player.quickslots')
+            local id, settings = te.runtime:selection('player.quickslots')
             if not id then inputHost:deactivate(); log('Quickslots template cleared; restored native input actions.')
             else
                 local template = te.registry.byId[id].template
-                local bound, why = inputHost:apply(template, configuration, service)
+                local bound, why = inputHost:apply(template, settings, service)
                 if bound then log('Committed template settings received; replacement quickslots bindings are active.')
                 else log('Quickslots bindings pending: ' .. tostring(why)) end
             end

@@ -15,18 +15,18 @@ end
 
 -- QSF historically exposed these identities. Keep them stable so existing
 -- indicator and bridge integration can receive the same UInputAction objects.
-function M.build(template, configuration, category)
+function M.build(template, settings, category)
     assert(type(template) == 'table' and template.category == 'player.quickslots',
         'quickslots template required')
-    assert(type(configuration) == 'table', 'quickslots configuration required')
+    assert(type(settings) == 'table', 'quickslots settings required')
     local ordered = V.orderedGroups(template, nil, category and category.actions)
-    local access = configuration.access
+    local access = settings.access
     assert(access == 0 or access == 1 or access == 2, 'unsupported quickslots access method')
     local result = {access = access, actions = {}}
 
     if access == 0 or access == 2 then
-        assert(type(configuration.direct) == 'table', 'direct quickslots bindings required')
-        local primary = type(configuration.settings) == 'table' and configuration.settings.PrimaryWheel == 1
+        assert(type(settings.direct) == 'table', 'direct quickslots bindings required')
+        local primary = settings.PrimaryWheel == 1
             and 'ability' or 'consumable'
         local first, second
         for _, item in ipairs(ordered) do
@@ -39,7 +39,7 @@ function M.build(template, configuration, category)
         for index, item in ipairs(ordered) do groupIndices[item.key] = index end
         local number = 0
         for _, item in ipairs({first, second}) do
-            local slots = assert(configuration.direct[item.key], 'missing direct bindings for ' .. item.key)
+            local slots = assert(settings.direct[item.key], 'missing direct bindings for ' .. item.key)
             for slot = 1, item.value.slots do
                 number = number + 1
                 result.actions[#result.actions + 1] = {
@@ -54,9 +54,9 @@ function M.build(template, configuration, category)
             end
         end
         if access == 2 then
-            assert(type(configuration.advanced) == 'table', 'advanced group bindings required')
+            assert(type(settings.advanced) == 'table', 'advanced group bindings required')
             for groupIndex, item in ipairs(ordered) do
-                local slots = assert(configuration.advanced[item.key],
+                local slots = assert(settings.advanced[item.key],
                     'missing advanced group bindings for ' .. item.key)
                 for slot = 1, item.value.slots do
                     local slotName = item.value.slotNames and item.value.slotNames[slot] or tostring(slot)
@@ -73,8 +73,8 @@ function M.build(template, configuration, category)
             end
         end
     else
-        assert(type(configuration.groups) == 'table', 'group quickslots bindings required')
-        assert(type(configuration.shared) == 'table', 'shared quickslots bindings required')
+        assert(type(settings.groups) == 'table', 'group quickslots bindings required')
+        assert(type(settings.shared) == 'table', 'shared quickslots bindings required')
         local maxSlots = 0
         for index, item in ipairs(ordered) do
             maxSlots = math.max(maxSlots, item.value.slots)
@@ -84,7 +84,7 @@ function M.build(template, configuration, category)
                 type = item.value.type,
                 groupIndex = index,
                 contexts = item.value.contexts or (category and category.contexts) or template.contexts,
-                binding = binding(configuration.groups[item.key], item.key .. ' group binding'),
+                binding = binding(settings.groups[item.key], item.key .. ' group binding'),
             }
         end
         for slot = 1, maxSlots do
@@ -93,7 +93,7 @@ function M.build(template, configuration, category)
                 shared = true,
                 slot = slot,
                 contexts = (category and category.contexts) or template.contexts,
-                binding = binding(configuration.shared[slot], 'shared slot ' .. slot),
+                binding = binding(settings.shared[slot], 'shared slot ' .. slot),
             }
         end
     end

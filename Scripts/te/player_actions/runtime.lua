@@ -20,8 +20,8 @@ return function(e)
         chord = e.chord, setChord = e.setChord, setTriggers = e.setTriggers, rebuild = e.rebuild,
     })
     local api = {}
-    function api:prepare(template, configuration)
-        return input:configure(template, configuration)
+    function api:prepare(template, settings)
+        return input:configure(template, settings)
     end
     function api:commit(kind, subsystem, nativePriority)
         input:attach(kind, subsystem, nativePriority)
@@ -35,8 +35,8 @@ return function(e)
         self.active[kind] = true
         return true
     end
-    function api:activate(template, configuration, subsystem, kind, nativePriority, ready)
-        local actions, plan = self:prepare(template, configuration)
+    function api:activate(template, settings, subsystem, kind, nativePriority, ready)
+        local actions, plan = self:prepare(template, settings)
         if ready ~= true then return actions, plan, 'bindings_pending' end
         self:commit(kind, subsystem, nativePriority)
         return actions, plan, 'applied'

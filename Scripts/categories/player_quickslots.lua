@@ -29,7 +29,8 @@ local category = {
               values = { 0, 1, 2 }, labels = { "Grouped", "Individual", "Advanced" }, default = 0,
               tab = true, level = 4, order = 2 },
 
-            { id = "Advanced", type = "text", default = "0|20,40,1.0,1.0|40,-420,0.8,0.7", order = -1 }
+            { id = "Advanced", type = "text", format = "quickslot_layout",
+              default = "0|20,40,1.0,1.0|40,-420,0.8,0.7", order = -1 }
 
        }
     }
@@ -63,7 +64,7 @@ local function restore(service, record)
     return true
 end
 
-function category:attach(service, switcher, configuration, previous, template)
+function category:attach(service, switcher, settings, previous, template)
     assert(service:valid(switcher), 'quickslots switcher unavailable')
     if previous and not service:same(previous.switcher, switcher) then
         restore(service, previous)
@@ -94,7 +95,7 @@ function category:attach(service, switcher, configuration, previous, template)
         restore(service, record)
         return record
     end
-    local requested = configuration.settings and configuration.settings.PrimaryWheel or 0
+    local requested = settings.PrimaryWheel or 0
     assert(requested == 0 or requested == 1, 'invalid primary quickslot wheel')
     if record.moved and record.primaryWheel == requested then return record end
     restore(service, record)

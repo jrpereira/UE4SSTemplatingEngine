@@ -22,7 +22,7 @@ local input = InputContext({
 local template = {name='Quickslots++', category='player.quickslots', actions={
     {name='Abilities',type='ability',slots=4}, {name='Consumables',type='consumable',slots=4},
 }}
-local direct, plan = input:configure(template, {access=0,settings={PrimaryWheel=1},direct={
+local direct, plan = input:configure(template, {access=0,PrimaryWheel=1,direct={
     ['1']={{key=49,mode=0},{key=0,mode=1},{key=0,mode=0},{key=0,mode=1}},
     ['2']={{key=0,mode=0},{key=0,mode=1},{key=0,mode=0},{key=0,mode=1}},
 }})

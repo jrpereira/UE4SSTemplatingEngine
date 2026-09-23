@@ -4,13 +4,16 @@ local Categories = require('te.categories')
 local Registry = require('te.registry')
 local Menu = require('te.menu')
 local Plan = require('te.player_actions.plan')
+local Layout = require('te.quickslot_layout')
 
 local category = dofile('Scripts/categories/player_quickslots.lua')
 local categories = Categories.new()
 categories:addCategory(category)
 local templates = {
     {name='Bottom', category='player.quickslots', settings={target='templates',enabled=false}},
-    {name='Vertical', category='player.quickslots', settings={target='templates',enabled=false}},
+    {name='Vertical', category='player.quickslots', settings={target='templates',enabled=false,
+        groups={{id='Layout',label='Layout'}}, fields={{id='Advanced',label='Override',
+            group='Layout',type='integer',min=0,max=10,default=3}}}},
 }
 local registry = Registry.new(categories, {execute=function() return templates end})
 registry:registerTemplate('fixture.lua')
@@ -38,13 +41,19 @@ assert(accessIndex and rows[bottom.direct['1'][1].key] > accessIndex)
 values[bottom.access] = 2
 values[bottom.direct['1'][1].key] = 77
 values[bottom.advanced['1'][1].key] = 78
+local textId = assert(next(menu.textSettings))
+assert(textId == 'TE_PlayerQuickslotsAdvanced')
+values[textId] = '1|10,-20,1.2,0.9|30,40,0.8,0.7'
+local layout = Layout.parse(values[textId])
+assert(layout.defaultWheel == 1 and layout.first.x == 10 and layout.second.opacity == 0.7)
 for _, selected in ipairs(choices) do
     values[selector.id] = selected
     local result = menu.decode(values)['player.quickslots']
     assert(result.id == selector.byValue[selected])
-    local config = result.configuration
-    assert(config.access == 2 and config.categorySettings.AccessMode == 2)
-    assert(config.categorySettings.Advanced == category.settings.fields[2].default)
+    local config = result.settings
+    assert(config.access == 2 and config.AccessMode == 2)
+    assert(config.Advanced == (selected == choices[2] and 3 or values[textId]))
+    assert(config.AccessMode == 2)
     assert(config.direct['1'][1].key == 77 and config.advanced['1'][1].key == 78)
     local plan = Plan.build(templates[1], config, category)
     assert(#plan.actions == 16)

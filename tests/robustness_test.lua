@@ -72,9 +72,9 @@ defaults[a.shared[1].mode] = 1
 defaults[a.groups.A.mode] = 1
 rejects(function() base.decode(defaults) end, 'invalid choice')
 defaults[a.groups.A.mode] = 2
-check(base.decode(defaults)['player.quickslots'].configuration.groups.A.mode == 2)
+check(base.decode(defaults)['player.quickslots'].settings.groups.A.mode == 2)
 defaults[a.groups.A.mode] = -1
-check(base.decode(defaults)['player.quickslots'].configuration.groups.A.mode == -1)
+check(base.decode(defaults)['player.quickslots'].settings.groups.A.mode == -1)
 
 -- Round-trip the catalog through a data-only Lua literal, like a host persistence adapter.
 local keys = {}; for k in pairs(base.catalog.entries) do keys[#keys + 1] = k end; table.sort(keys)

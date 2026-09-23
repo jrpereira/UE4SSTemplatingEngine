@@ -35,8 +35,8 @@ return function(e)
         if mode == 1 then t.HoldTimeThreshold=e.holdSeconds or .2; t.bIsOneShot=true else t.TapReleaseTimeThreshold=e.holdSeconds or .2 end
         a.Triggers = {t}
     end
-    function api:configure(template, configuration)
-        local plan=Plan.build(template, configuration, e.category); local current={}
+    function api:configure(template, settings)
+        local plan=Plan.build(template, settings, e.category); local current={}
         for _,d in ipairs(plan.actions) do
             local a=action(d.id); a.ValueType,a.bConsumeInput,a.bTriggerWhenPaused=0,false,false
             if d.binding.mode ~= -1 then trigger(a,d.binding.mode) else a.Triggers={} end

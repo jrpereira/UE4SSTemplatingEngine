@@ -110,7 +110,7 @@ function M.new(queue,log,category)
   return true
  end
  function api:activate(kind,nativePriority,sub,component)
-  local template,configuration=self.template,self.configuration
+  local template,settings=self.template,self.settings
   if not template then return false,'no selected quickslots template' end
   if not self.bound then
    if self.dispatcher then
@@ -120,7 +120,7 @@ function M.new(queue,log,category)
    end
    local bridge,bridgeWhy=bridgeApi()
    if not bridge then return false,bridgeWhy end
-   local ok,actions,plan=pcall(function()return runtime:prepare(template,configuration)end)
+   local ok,actions,plan=pcall(function()return runtime:prepare(template,settings)end)
    if not ok then return false,actions end
    local dispatcher=Dispatch({bridge=bridge,fullName=full,componentPath=path})
    self.dispatcher=dispatcher
@@ -143,7 +143,7 @@ function M.new(queue,log,category)
      self.groupModes[definition.groupIndex]=definition.binding.mode
     end
    end
-   local preferred=type(configuration.settings)=='table' and configuration.settings.PrimaryWheel==1
+   local preferred=settings.PrimaryWheel==1
        and 'ability' or 'consumable'
    for index,kind in pairs(self.groupTypes)do
     if kind==preferred then self.defaultGroup,self.selectedGroup=index,index end
@@ -183,10 +183,10 @@ function M.new(queue,log,category)
   end
   return true
  end
- function api:apply(template,configuration,service)
+ function api:apply(template,settings,service)
   local cleared,why=self:deactivate()
   if not cleared then return false,why end
-  self.template,self.configuration,self.service=template,configuration,service
+  self.template,self.settings,self.service=template,settings,service
   self.defaultGroup=1
   self.selectedGroup=self.defaultGroup
   return self:sync()
