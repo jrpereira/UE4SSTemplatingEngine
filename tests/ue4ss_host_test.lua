@@ -1,6 +1,7 @@
 package.path = 'Scripts/?.lua;' .. package.path
 
 local hooks, notifications = {}, {}
+local mapPost
 FindAllOf = function() return {} end
 StaticFindObject = function() return nil end
 StaticConstructObject = function() return nil end
@@ -11,8 +12,9 @@ RegisterHook = function(path, before, after)
 end
 NotifyOnNewObject = function(path, callback)
     assert(type(callback) == 'function')
-    notifications[path] = true
+    notifications[path] = callback
 end
+RegisterLoadMapPostHook = function(callback) mapPost=callback end
 
 local host = require('te.player_actions.ue4ss_host').new(function(callback) callback() end, function() end)
 assert(type(host.sync) == 'function', 'expected Enhanced Input host')
@@ -29,4 +31,7 @@ end
 assert(notifications['/Script/Engine.PlayerController'], 'missing PlayerController creation wake')
 assert(notifications['/Script/EnhancedInput.EnhancedInputLocalPlayerSubsystem'],
     'missing Enhanced Input subsystem creation wake')
+assert(notifications['/Script/EnhancedInput.EnhancedInputComponent'],
+    'missing pawn input component creation wake')
+assert(type(mapPost)=='function', 'missing map-load completion wake')
 print('UE4SS host: 9 checks passed')

@@ -90,7 +90,7 @@ function M.generate(registry, options)
         for _, name in ipairs(names) do lines[#lines + 1] = name .. '=' .. tostring(fields[name]) end
         lines[#lines + 1] = ''
     end
-    emit('Mod', {Id = 'UE4SSTemplatingEngine', Name = 'Templates', Version = '0.0.18',
+    emit('Mod', {Id = 'UE4SSTemplatingEngine', Name = 'Templates', Version = '0.0.19',
         Description = options.description and text(options.description) or nil})
     local function row(fields)
         assert(#rows < 256, 'generated menu exceeds DMM limit of 256 settings')
@@ -448,7 +448,7 @@ function M.generate(registry, options)
             if item.ammLevel == 1 then headerPickers = headerPickers + 1 end
         end
         assert(headerPickers <= 1, providerName .. ': only one level-1 picker per page')
-        append(output, 'Mod', {Id=providerId, Name=providerName, Version='0.0.18',
+        append(output, 'Mod', {Id=providerId, Name=providerName, Version='0.0.19',
             Description=options.description and text(options.description) or nil})
         local usedGroups, visibleGroups, hiddenByGroup = {}, {}, {}
         for _, item in ipairs(selectedRows) do

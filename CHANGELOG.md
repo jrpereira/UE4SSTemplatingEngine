@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.19 - 2026-09-23
+
+- Load category objects directly at boot and generate category and template menus with shared quickslot controls.
+- Merge category and template settings before delivering them to lifecycle hooks.
+- Generate Advanced quickslot group bindings and require group selection before slot activation.
+- Support template fields whose visibility follows another picker, and place a single template picker in the page header.
+- Retry Enhanced Input attachment when the pawn input component is created or a map finishes loading.
+
 ## 0.0.18 - 2026-09-22
 
 - Remove the obsolete `collection` field and use category/name identities for templates.

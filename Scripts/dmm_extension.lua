@@ -55,7 +55,7 @@ return {
                     id = page.id,
                     name = page.name,
                     author = page.author or 'Templating Engine',
-                    version = page.version or '0.0.18',
+                    version = page.version or '0.0.19',
                     description = page.description or ('Templates and settings for ' .. page.name .. '.'),
                     choices = choices,
                     settingsCount = #choices,
