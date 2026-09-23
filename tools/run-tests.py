@@ -16,7 +16,7 @@ if 'Lua 5.4' not in version.stdout + version.stderr:
     parser.error('Lua 5.4 required')
 for directory in ('work', 'outputs'):
     (ROOT / directory).mkdir(exist_ok=True)
-files = sorted(ROOT.glob('Scripts/**/*.lua')) + [ROOT / 'categories.lua']
+files = sorted(ROOT.glob('Scripts/**/*.lua'))
 for path in files:
     env = dict(os.environ, TE_SYNTAX_FILE=str(path))
     subprocess.run([args.lua, '-e', 'assert(loadfile(os.getenv("TE_SYNTAX_FILE")))'], cwd=ROOT, env=env, check=True)

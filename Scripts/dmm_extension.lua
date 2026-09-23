@@ -20,8 +20,12 @@ return {
         api.pages.build = function(tree, providers, status, hostApi)
             local generatedIds = {}
             for _, page in ipairs(definitions.pages) do generatedIds[page.id] = true end
+            local previousPositions = {}
             for index = #providers, 1, -1 do
-                if generatedIds[providers[index].id] then table.remove(providers, index) end
+                if generatedIds[providers[index].id] then
+                    previousPositions[providers[index].id] = index
+                    table.remove(providers, index)
+                end
             end
             local ids = {}
             for _, provider in ipairs(providers) do ids[provider.id] = true end
@@ -41,11 +45,11 @@ return {
                 end
             end
             assert(aggregate ~= nil, 'TE aggregate provider unavailable')
-            local categoryProviders = {}
+            local categoryProviders, moduleProviders = {}, {}
             for _, page in ipairs(definitions.pages) do
                 assert(type(page.id) == 'string' and not ids[page.id], 'duplicate TE category provider')
                 local choices = api.choices.parse(page.manifest)
-                categoryProviders[#categoryProviders + 1] = {
+                local generated = {
                     id = page.id,
                     name = page.name,
                     author = page.author or 'Templating Engine',
@@ -57,9 +61,14 @@ return {
                     testOnly = false,
                     logoFile = '',
                     logoAsset = '',
-                    ammBrowserLevel = 4,
-                    ammBrowserIndent = 20,
                 }
+                if page.category then
+                    generated.ammBrowserLevel, generated.ammBrowserIndent = 4, 20
+                    categoryProviders[#categoryProviders + 1] = generated
+                else
+                    generated._teModule = assert(page.module, 'generated page needs category or module')
+                    moduleProviders[#moduleProviders + 1] = generated
+                end
                 ids[page.id] = true
             end
             table.sort(providers, function(a, b)
@@ -75,6 +84,28 @@ return {
             assert(aggregateIndex ~= nil, 'TE aggregate provider lost during ordering')
             for index, provider in ipairs(categoryProviders) do
                 table.insert(providers, aggregateIndex + index, provider)
+            end
+            for _, generated in ipairs(moduleProviders) do
+                local wanted, match = generated._teModule:lower(), nil
+                generated._teModule = nil
+                for index, provider in ipairs(providers) do
+                    local id, name = tostring(provider.id or ''):lower(), tostring(provider.name or ''):lower()
+                    if name == wanted or id == wanted or id == 'detected:ue4ss:' .. wanted then
+                        assert(match == nil, 'duplicate module provider: ' .. generated.name)
+                        match = index
+                    end
+                end
+                if match and providers[match].noSettings then
+                    table.remove(providers, match)
+                    table.insert(providers, match, generated)
+                elseif match then
+                    generated.ammBrowserLevel, generated.ammBrowserIndent = 4, 20
+                    table.insert(providers, match + 1, generated)
+                elseif previousPositions[generated.id] then
+                    table.insert(providers, math.min(previousPositions[generated.id], #providers + 1), generated)
+                else
+                    providers[#providers + 1] = generated
+                end
             end
             return build(tree, providers, status, hostApi)
         end

@@ -10,4 +10,4 @@ local ok, err = pcall(function()
     require('te.menu_host').start(root, Settings, ExecuteInGameThread, log)
 end)
 if not ok then log(VERSION .. ' startup failed: ' .. tostring(err))
-else log(VERSION .. ' loaded; no native gameplay cutover') end
+else log(VERSION .. ' loaded; template input activates after a committed Apply') end

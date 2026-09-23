@@ -242,7 +242,8 @@ function M.generate(registry, options)
                     end
                 end
                 if category == 'player.quickslots' then
-                    local ordered = V.orderedGroups(template, (options.groupOrders or {})[entry.id])
+                    local ordered = V.orderedGroups(template, (options.groupOrders or {})[entry.id],
+                        registry.categories:getCategory(category).actions)
                     local access = namedId(scopePrefix .. 'AccessMethod', {'access', identity})
                     local accessGroup = group(key({identity, 'access'}), 'Input Method', ownerSelector, ownerValue,
                         ownerSelector, ownerValue, 3, 0, scopePrefix .. 'AccessMethodSection')
@@ -438,11 +439,24 @@ function M.generate(registry, options)
         end
         return selected
     end
-    local categoryOwned = {}
+    local categoryOwned, moduleOwned, moduleCategories = {}, {}, {}
     for _, entry in ipairs(entries) do
         local template = entry.template
-        categoryOwned[template.category] = categoryOwned[template.category] or {}
-        categoryOwned[template.category][entry.id] = true
+        if template.settings.target == 'templates' then
+            categoryOwned[template.category] = categoryOwned[template.category] or {}
+            categoryOwned[template.category][entry.id] = true
+        else
+            local normalized = entry.location:gsub('\\', '/'):gsub('%[%d+%]$', '')
+            local parent = normalized:match('^(.*)/Scripts/templates/[^/]+%.lua$')
+                or normalized:match('^(.*)/Scripts/[^/]+%.lua$')
+                or normalized:match('^(.*)/templates/[^/]+%.lua$')
+            local module = parent and parent:match('([^/]+)$')
+            assert(module and module ~= '', entry.location
+                .. ': target=module requires a <Module>/Scripts/<file>.lua or '
+                .. '<Module>/Scripts/templates/<file>.lua registration path')
+            moduleOwned[module], moduleCategories[module] = moduleOwned[module] or {}, moduleCategories[module] or {}
+            moduleOwned[module][entry.id], moduleCategories[module][template.category] = true, true
+        end
     end
     for _, category in ipairs(registry.categories:list()) do
         if categoryOwned[category] then
@@ -454,6 +468,16 @@ function M.generate(registry, options)
             page.decode = makeDecoder(page.rows, included)
             pages[#pages + 1], pageByCategory[category], providers[providerId] = page, page, page
         end
+    end
+    local moduleNames = {}; for module in pairs(moduleOwned) do moduleNames[#moduleNames + 1] = module end
+    table.sort(moduleNames)
+    for _, module in ipairs(moduleNames) do
+        local providerId = aggregateId .. '.module.' .. publicName(module)
+        local selectedRows = routedRows(moduleCategories[module], moduleOwned[module])
+        local page = {id=providerId, name=module, module=module, rows=selectedRows,
+            manifest=providerManifest(providerId, module, selectedRows, false)}
+        page.decode = makeDecoder(page.rows, moduleCategories[module], moduleOwned[module])
+        pages[#pages + 1], pageByModule[module], providers[providerId] = page, page, page
     end
     return {manifest = aggregateManifest, fullManifest = table.concat(lines, '\n'), catalog = catalog,
         rows = rows, selectors = selectors, multiSelectors=multiSelectors, definitions = decoded, warnings = warnings,

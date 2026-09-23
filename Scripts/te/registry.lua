@@ -42,9 +42,12 @@ function M.new(categories, options)
         -- Registry state is atomic across a batch. Executed Lua side effects are not reversible.
         for _, file in ipairs(self.files) do
             if not self.loaded[file.key] then
-                local ok, value = pcall(execute, file.path)
-                assert(ok, file.path .. ': ' .. tostring(value))
-                for _, entry in ipairs(V.flatten(value, self.categories, file.path)) do
+                local result = table.pack(pcall(execute, file.path))
+                assert(result[1], file.path .. ': ' .. tostring(result[2]))
+                assert(result.n <= 3, file.path .. ': expected one or two return values')
+                local value, header = result[2]
+                if result.n == 3 then header, value = value, result[3] end
+                for _, entry in ipairs(V.flatten(value, self.categories, file.path, header)) do
                     local id = U.identity(entry.template)
                     assert(not self.byId[id] and not pendingIds[id], entry.location .. ': duplicate template identity')
                     pendingIds[id] = true

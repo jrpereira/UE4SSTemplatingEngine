@@ -1,16 +1,17 @@
 package.path = 'Scripts/?.lua;' .. package.path
 local TE = require('te.init')
+local CategoryFiles = require('te.category_files')
 local quickslotsPath, fixesPath, destination, existing = assert(arg[1]), assert(arg[2]), assert(arg[3]), arg[4]
-local description = 'Menu test: settings are saved, but new gameplay bindings and template visuals are not active.'
+local description = 'Menu test: Action Fandango quickslot layouts and input activate after Apply.'
 local te=TE.new({listFiles=function() return {} end})
-te:registerTemplate('templates/default.lua');te:registerTemplate(quickslotsPath)
+te:registerTemplate('Scripts/default.lua');te:registerTemplate(quickslotsPath)
 te:registerTemplate(fixesPath);te:loadTemplatesFromRegister()
-assert(#te.registry.templates == 3, 'expected TE, Quickslots and AMM templates')
-local consumer
+assert(#te.registry.templates == 4, 'expected TE, two Action Fandango and AMM templates')
+local consumers = {}
 for _,entry in ipairs(te.registry.templates) do
-    if entry.template.category=='player.quickslots' then consumer=entry.template end
+    if entry.template.category=='player.quickslots' then consumers[entry.template.name]=true end
 end
-assert(consumer and not consumer.widgetRenderingEnabled, 'expected rendering-disabled consumer template')
+assert(consumers['Swapping Fixed'] and consumers['Dual Wheels'], 'expected Action Fandango templates')
 local fixes
 for _,entry in ipairs(te.registry.templates) do
     if entry.template.category=='menu.fixes' then fixes=entry.template end
@@ -36,6 +37,9 @@ local lines={'return {version=1,next='..menu.catalog.next..',entries={'}
 local keys={};for key in pairs(menu.catalog.entries) do keys[#keys+1]=key end;table.sort(keys)
 for _,key in ipairs(keys) do lines[#lines+1]=string.format('[%q]=%d,',key,menu.catalog.entries[key]) end
 lines[#lines+1]='}}\n';write('identity-catalog.lua',table.concat(lines,'\n'))
-write('menu-profile.lua','return {mode="menu-test",templates={"templates/default.lua","../QuickslotsForever/templates/quickslots.lua","../AdaptiveModMenu/templates/fixes.lua"},description='..string.format('%q',description)..'}\n')
+local categoryPaths = CategoryFiles.list('Scripts/categories')
+local categories = {}
+for _, path in ipairs(categoryPaths) do categories[#categories + 1] = string.format('%q', path) end
+write('menu-profile.lua','return {mode="menu-test",categories={'..table.concat(categories,',')..'},templates={"Scripts/default.lua","../ActionFandango/Scripts/templates/main.lua","../AdaptiveModMenu/Scripts/fixes.lua"},description='..string.format('%q',description)..'}\n')
 write('enabled.txt','')
 print('Built '..#menu.rows..' settings across Templates and '..#menu.pages..' routed pages')

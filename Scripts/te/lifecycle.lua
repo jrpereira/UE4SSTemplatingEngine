@@ -6,7 +6,7 @@ local M = {}
 
 function M.new(registry, options)
     options = options or {}
-    local self = {active = {}, pending = {}, multi = {}, revision = 0}
+    local self = {active = {}, pending = {}, multi = {}, categoryHandles = {}, revision = 0}
     local busy = false
     local function enabled(template) return template.settings.enabled == true end
     local function resolveService(category, context)
@@ -30,11 +30,17 @@ function M.new(registry, options)
         end
         return service
     end
-    local function resolveTarget(category, context, supplied)
+    local function resolveTarget(category, context, supplied, service)
         local target = supplied
-        if target == nil and options.resolveTarget then target = options.resolveTarget(category, context) end
         if target == nil and type(context) == 'table' and type(context.targets) == 'table' then
             target = context.targets[category]
+        end
+        local definition = registry.categories:getCategory(category)
+        if target == nil and definition.resolveTarget then
+            target = definition:resolveTarget(service, context)
+        end
+        if target == nil and options.resolveTarget then
+            target = options.resolveTarget(category, context, definition)
         end
         return target
     end
@@ -46,23 +52,62 @@ function M.new(registry, options)
         if not ok then return nil, tostring(result) end
         return result, err
     end
-    local function detach(category, context, reason, stateKey)
+    local function categoryInUse(category)
+        for _, current in pairs(self.active) do
+            if current.template.category == category and not current.inert and not current.suppressed then
+                return true
+            end
+        end
+        return false
+    end
+    local function detachCategory(category, context, reason)
+        local record = self.categoryHandles[category]
+        if not record then return true end
+        if reason == 'world_invalidated' then self.categoryHandles[category] = nil; return true end
+        local definition = registry.categories:getCategory(category)
+        local ok, result, err = pcall(definition.detach, definition,
+            resolveService(category, context), record.handle, reason)
+        if not ok then return nil, tostring(result) end
+        if result ~= true then return nil, err or 'category detach must return true on success' end
+        self.categoryHandles[category] = nil
+        return true
+    end
+    local function clearUnusedCategory(category, context, reason)
+        if categoryInUse(category) then return true end
+        return detachCategory(category, context, reason)
+    end
+    local function detach(category, context, reason, stateKey, preserveCategory)
         local slot = stateKey or category
         self.pending[slot] = nil
         if reason == 'world_invalidated' then
             self.active[slot] = nil
+            if not categoryInUse(category) then return clearUnusedCategory(category, context, reason) end
             return true
         end
         local current = self.active[slot]
-        if not current then return true end
+        if not current then
+            if not preserveCategory then
+                return clearUnusedCategory(category, context, reason)
+            end
+            return true
+        end
         if current.inert or current.suppressed or not enabled(current.template) then
-            self.active[slot]=nil;return true
+            self.active[slot]=nil
+            if not preserveCategory then
+                return clearUnusedCategory(category, context, reason)
+            end
+            return true
         end
         local service = resolveService(category, context)
-        local ok, result, err = pcall(current.template.detach, current.template, service, current.handle, reason)
+        local shared = self.categoryHandles[category]
+        local ok, result, err = pcall(current.template.detach, current.template, service, current.handle,
+            reason, shared and shared.handle or nil)
         if not ok then return nil, tostring(result) end
         if result ~= true then return nil, err or 'detach must return true on success' end
         self.active[slot] = nil
+        if not preserveCategory then
+            return clearUnusedCategory(category, context, reason)
+        end
         return true
     end
     function self:detach(category, context, reason)
@@ -109,25 +154,78 @@ function M.new(registry, options)
             end
             -- Validate before releasing an old attachment, then resolve freshly for each call.
             local service = resolveService(category, context)
-            local target = resolveTarget(category, context, suppliedTarget)
+            local target = resolveTarget(category, context, suppliedTarget, service)
             if Events.requiresTarget(category) and not service:valid(target) then
                 self.pending[slot] = {id=identity, template=entry.template, configuration=spec}
                 return true, 'not_ready'
             end
             if previous and previous.suppressed then self.active[slot]=nil;previous=nil end
             if previous and previous.id ~= identity then
-                local ok, err = detach(category, context, 'switch', stateKey)
+                local ok, err = detach(category, context, 'switch', stateKey, true)
                 if not ok then return nil, err end
                 previous = nil
             end
+            local definition = registry.categories:getCategory(category)
+            local function recover(failure)
+                if previous and previous.id == identity and self.active[slot] == previous then
+                    local shared = self.categoryHandles[category]
+                    if definition.attach then
+                        local ok, restored, why = pcall(definition.attach, definition, service, target,
+                            U.copy(previous.configuration), shared and shared.handle or nil, previous.template)
+                        if not ok or restored == nil or restored == false then
+                            return nil, tostring(failure) .. '; category restoration failed: '
+                                .. tostring(ok and why or restored)
+                        end
+                        self.categoryHandles[category] = {handle=restored}
+                        shared = self.categoryHandles[category]
+                    end
+                    local ok, restored, why = pcall(previous.template.attach, previous.template,
+                        service, target, U.copy(previous.configuration), previous.handle,
+                        shared and shared.handle or nil)
+                    if not ok or restored == nil or restored == false then
+                        return nil, tostring(failure) .. '; template restoration failed: '
+                            .. tostring(ok and why or restored)
+                    end
+                    previous.handle = restored
+                    return nil, failure
+                end
+                local cleaned, why = clearUnusedCategory(category, context, 'attach_failed')
+                if not cleaned then return nil, tostring(failure) .. '; category cleanup: ' .. tostring(why) end
+                return nil, failure
+            end
+            if definition.attach then
+                local prior = self.categoryHandles[category]
+                local ok, handle, err = pcall(definition.attach, definition, service, target,
+                    U.copy(spec), prior and prior.handle or nil, entry.template)
+                if not ok then
+                    return recover(tostring(handle))
+                end
+                if (handle == nil or handle == false) and err == 'not_ready' then
+                    local _, why = recover('not_ready')
+                    if why ~= 'not_ready' then return nil, why end
+                    self.pending[slot] = {id=identity, template=entry.template, configuration=spec}
+                    return true, 'not_ready'
+                end
+                if handle == nil or handle == false then
+                    return recover(err or 'category attach returned no handle')
+                end
+                self.categoryHandles[category] = {handle=handle}
+            end
             local ok, handle, err = pcall(entry.template.attach, entry.template, service, target,
-                U.copy(spec), previous and previous.handle or nil)
-            if not ok then return nil, tostring(handle) end
+                U.copy(spec), previous and previous.handle or nil,
+                self.categoryHandles[category] and self.categoryHandles[category].handle or nil)
+            if not ok then
+                return recover(tostring(handle))
+            end
             if (handle == nil or handle == false) and err == 'not_ready' then
+                local _, why = recover('not_ready')
+                if why ~= 'not_ready' then return nil, why end
                 self.pending[slot] = {id=identity, template=entry.template, configuration=spec}
                 return true, 'not_ready'
             end
-            if handle == nil or handle == false then return nil, err or 'attach returned no handle' end
+            if handle == nil or handle == false then
+                return recover(err or 'attach returned no handle')
+            end
             self.pending[slot] = nil
             self.active[slot] = {id = identity, template = entry.template, handle = handle, configuration = spec}
             return true
@@ -157,7 +255,9 @@ function M.new(registry, options)
     end
     local function renderRecord(category, current, context, target, reason)
         if not current or current.inert or current.suppressed or not enabled(current.template) then return 'ignored' end
-        local status, err = current.template:render(resolveService(category, context), current.handle, target, reason)
+        local shared = self.categoryHandles[category]
+        local status, err = current.template:render(resolveService(category, context), current.handle,
+            target, reason, shared and shared.handle or nil)
         assert(status == 'applied' or status == 'not_ready' or status == 'ignored',
             'invalid render status: ' .. tostring(status))
         return status, err
@@ -181,7 +281,8 @@ function M.new(registry, options)
     end
     local function dispatchRecord(category, event, context, payload, stateKey)
         local desired = self.pending[stateKey] or self.active[stateKey]
-        if not desired or not Events.interested(desired.template, event) then return 'ignored' end
+        if not desired or not Events.interested(desired.template, event,
+            registry.categories:getCategory(category).events) then return 'ignored' end
         if desired.suppressed or not enabled(desired.template) then return 'ignored' end
         if self.pending[stateKey] then
             local attached, why = apply(category, desired.id, desired.configuration, context, nil, stateKey)
@@ -208,7 +309,8 @@ function M.new(registry, options)
                 return overall, detail
             end
             local desired = self.pending[category] or self.active[category]
-            if not desired or not Events.interested(desired.template, event) then return 'ignored' end
+            if not desired or not Events.interested(desired.template, event,
+                registry.categories:getCategory(category).events) then return 'ignored' end
             if desired.suppressed or not enabled(desired.template) then return 'ignored' end
             if self.pending[category] then
                 local attached, why = apply(category, desired.id, desired.configuration, context)
@@ -218,7 +320,9 @@ function M.new(registry, options)
             local current = self.active[category]
             if not current then return 'ignored' end
             if current.inert then return 'ignored' end
-            local status, err = current.template:render(resolveService(category, context), current.handle, payload, event)
+            local shared = self.categoryHandles[category]
+            local status, err = current.template:render(resolveService(category, context), current.handle,
+                payload, event, shared and shared.handle or nil)
             assert(status == 'applied' or status == 'not_ready' or status == 'ignored',
                 'invalid render status: ' .. tostring(status))
             return status, err

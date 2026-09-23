@@ -83,8 +83,9 @@ function M.active(declaration,context)
     return false
 end
 
-function M.interested(template, event)
-    for _,declared in ipairs(M.declarations(template.category,template.events,template.subscribe,template.name)) do
+function M.interested(template, event, categoryEvents)
+    for _,declared in ipairs(M.declarations(template.category,categoryEvents or template.events,
+        template.subscribe,template.name)) do
         if declared.name == event then return true end
     end
     return false

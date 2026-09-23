@@ -3,9 +3,7 @@ local TE = require('te.init')
 local checks = 0
 local function check(value) assert(value); checks = checks + 1 end
 local template = {category = 'player.quickslots', name = 'Integrated',
-    settings = {target='templates',enabled=true},
-    events = {'GroupSelected'},
-    actions = {{name = 'Actions', slots = 2, type = 'any'}}}
+    settings = {target='templates',enabled=true}}
 local attaches, detached, rendered = 0, 0, nil
 function template:attach(context, target, spec, previous)
     check(target and target.kind=='switcher')
@@ -16,8 +14,9 @@ end
 function template:detach() detached = detached + 1; return true end
 function template:render(_,_,payload,event) rendered={payload=payload,event=event};return 'applied' end
 local executions = 0
+local switcher = {kind='switcher', GetChildrenCount=function() return 0 end}
 local te = TE.new({listFiles = function(folder)
-    check(folder == 'templates'); return {'templates/fixture.lua'}
+    check(folder == 'Scripts'); return {'Scripts/fixture.lua'}
 end, execute = function() executions = executions + 1; return template end})
 check(#te.registry.files == 1 and #te.registry.templates == 0)
 local hook, loads = nil, {}
@@ -35,7 +34,7 @@ local stop = te:subscribeApplied({subscribe = function(provider, fn)
     callbacks[provider] = fn
     return function() unsubscribed = unsubscribed + 1 end
 end}, menu, function() return {playerActions = dofile('tests/support/service.lua')(),
-    targets={['player.quickslots']={kind='switcher'}}} end,
+    targets={['player.quickslots']=switcher}} end,
 function(ok, errors) outcomes[#outcomes + 1] = {ok = ok, errors = errors} end)
 local callback = assert(callbacks.UE4SSTemplatingEngine)
 check(callbacks['UE4SSTemplatingEngine.player.quickslots'] ~= nil)
@@ -43,11 +42,12 @@ check(callbacks['UE4SSTemplatingEngine.player.stats'] == nil)
 check(attaches == 0) -- Editing values locally has no runtime effect.
 local eventCallbacks,eventStops,eventOutcomes={},0,{}
 local stopEvents=te:subscribeEvents({subscribe=function(category,event,fn)
-    check(category=='player.quickslots' and event.name=='GroupSelected' and event.path==nil)
+    check(category=='player.quickslots' and (event.name=='GroupSelected' or event.name=='SlotActivated')
+        and event.path==nil)
     eventCallbacks[event.name]=fn
     return function() eventStops=eventStops+1 end
 end},function() return {playerActions=dofile('tests/support/service.lua')(),
-    targets={['player.quickslots']={kind='switcher'}}} end,
+    targets={['player.quickslots']=switcher}} end,
 function(status,detail,category,event)
     eventOutcomes[#eventOutcomes+1]={status=status,detail=detail,category=category,event=event}
 end)
@@ -68,7 +68,7 @@ check(detached == 1 and te.runtime:selection('player.quickslots') == nil)
 callback({providerId = 'UE4SSTemplatingEngine', revision = 3, values = {}})
 check(not outcomes[#outcomes].ok and te.runtime.revision == 2)
 stop(); stop(); check(unsubscribed == #menu.pages + 1)
-stopEvents();stopEvents();check(eventStops==1)
+stopEvents();stopEvents();check(eventStops==2)
 
 -- Exercise the actual text loader with a real file and a restricted environment.
 local path = 'work/loader-fixture.lua'

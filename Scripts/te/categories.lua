@@ -3,6 +3,22 @@ local M = {}
 
 function M.new()
     local self = {_categories = {}, _registered = {}}
+    function self:addCategory(definition)
+        assert(type(definition) == 'table', 'category object must be a table')
+        local name = U.text(definition.name, 'category name')
+        local module, category = name:match('^([%a_][%w_]*)%.([%a_][%w_]*)$')
+        assert(module and category, name .. ': invalid category name')
+        assert(not self._registered[name], 'duplicate category: ' .. name)
+        self._categories[module] = self._categories[module] or {}
+        local state = {visible = 0, count = 0, templates = {}}
+        for key, value in pairs(definition) do
+            U.text(key, name .. ' property')
+            state[key] = value
+        end
+        self._categories[module][category] = state
+        self._registered[name] = true
+        return state
+    end
     function self:registerCategory(module, categories)
         U.text(module, 'category')
         assert(module:match('^[%a_][%w_]*$'), 'category: invalid root name')

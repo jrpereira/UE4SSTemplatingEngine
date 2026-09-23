@@ -11,8 +11,9 @@ local function rejects(fn, fragment)
     checks = checks + 1
 end
 local categories = Categories.new()
-dofile('categories.lua')(function(...) categories:registerCategory(...) end,
-    function(...) return categories:setCategory(...) end)
+for _, path in ipairs(require('te.category_files').list('Scripts/categories')) do
+    categories:addCategory(assert(loadfile(path))())
+end
 check(table.concat(categories:list(), ',') == 'menu.controls,menu.fixes,menu.templates,npc.attacks,npc.intent,npc.level,npc.melee,npc.pawn,other.unknown,player.charges,player.compass,player.notifications,player.quickslots,player.self,player.stats,player.wheel')
 check(not categories:contains('player') and not categories:contains('npc') and not categories:contains('other'))
 check(categories._categories.player.quickslots.visible == 0)
@@ -70,6 +71,10 @@ check(not Events.active({contexts={'combat'}},{contexts={'openworld'}}))
 rejects(function() V.template({name='Attacks',category='npc.attacks',settings={target='templates',enabled=false},subscribe={{path='Bad',
     events={'created'},contexts={'combat'}}}},categories,'attacks.lua') end,'unsupported npc.attacks path Bad')
 check(not categories:contains('player.actions') and not categories:contains('quickslots'))
+-- Keep the following legacy validation cases isolated from the bundled action object.
+categories = Categories.new()
+categories:registerCategory('player', {'quickslots'})
+categories:setCategory('player.quickslots', {single=true})
 local function template(name)
     return {name = name or 'First', category = 'player.quickslots',
         settings={target='templates',enabled=false},
@@ -140,4 +145,39 @@ check(#registry.templates == 2 and quickslots.count == 2 and #quickslots.templat
 sources['d.lua'] = template('Fourth')
 check(registry:loadTemplatesFromRegister() == 2 and #registry.templates == 4
     and quickslots.count == 4 and #quickslots.templates == 4)
+local returnCategories = Categories.new()
+returnCategories:registerCategory('custom', {'samples'})
+local header = {category='custom.samples', settings={target='templates', enabled=false}, tag='shared'}
+local headerTemplate = {name='Header single', tag='local'}
+local headerArray = {{name='Header array one'}, {name='Header array two'}}
+local returns = {
+    ['single.lua'] = function()
+        return {name='Single', category='custom.samples', settings={target='templates', enabled=false}}
+    end,
+    ['array.lua'] = function()
+        return {
+            {name='Array one', category='custom.samples', settings={target='templates', enabled=false}},
+            {name='Array two', category='custom.samples', settings={target='templates', enabled=false}},
+        }
+    end,
+    ['header-single.lua'] = function() return header, headerTemplate end,
+    ['header-array.lua'] = function() return header, headerArray end,
+}
+local returnRegistry = Registry.new(returnCategories, {execute=function(path) return returns[path]() end})
+for _, path in ipairs({'single.lua', 'array.lua', 'header-single.lua', 'header-array.lua'}) do
+    check(returnRegistry:registerTemplate(path))
+end
+check(returnRegistry:loadTemplatesFromRegister() == 6)
+local loaded = returnRegistry.templates
+check(loaded[1].template.name == 'Single' and loaded[2].template.name == 'Array one'
+    and loaded[3].template.name == 'Array two')
+check(loaded[4].template.name == 'Header single' and loaded[4].template.category == header.category)
+check(loaded[4].template.tag == 'local' and loaded[5].template.tag == 'shared'
+    and loaded[6].template.tag == 'shared')
+check(loaded[5].template.settings ~= header.settings
+    and loaded[5].template.settings ~= loaded[6].template.settings)
+check(headerTemplate.category == nil and headerArray[1].category == nil)
+returns['bad-header.lua'] = function() return 'bad', {name='Bad'} end
+returnRegistry:registerTemplate('bad-header.lua')
+rejects(function() returnRegistry:loadTemplatesFromRegister() end, 'expected header table')
 print('registry: ' .. checks .. ' checks passed')

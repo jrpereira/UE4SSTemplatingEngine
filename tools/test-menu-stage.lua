@@ -6,6 +6,8 @@ local callbacks,queued,logs={}, {}, {}
 local runtime,menu=require('te.menu_host').start(root,{subscribe=function(id,fn)
     callbacks[id]=fn;return function() callbacks[id]=nil end
 end},function(fn) queued[#queued+1]=fn end,function(message) logs[#logs+1]=message end)
+local profile=assert(loadfile(root..'/menu-profile.lua','t',{}))()
+check(#profile.categories==#runtime.categories:list())
 check(runtime.runtime:selection('player.quickslots')==nil)
 local provider=assert(callbacks.UE4SSTemplatingEngine)
 local values={};for _,row in ipairs(menu.aggregate.rows) do values[row.Id]=tonumber(row.Default) end
@@ -18,7 +20,7 @@ local quickslots
 for _,entry in ipairs(runtime.registry.templates) do
     if entry.template.category=='player.quickslots' then quickslots=entry.template end
 end
-check(quickslots and quickslots.widgetRenderingEnabled==false)
+check(quickslots ~= nil)
 values[selector.id]=0
 provider({providerId='UE4SSTemplatingEngine',revision=2,values=values});queued[1]()
 check(runtime.runtime:selection('player.quickslots')==nil)

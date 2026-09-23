@@ -1,5 +1,6 @@
 -- Explicit menu-testing host. No input mapping, native discovery or visual hooks.
 local TE = require('te.init')
+local ObjectPaths = require('te.object_paths')
 local M = {}
 local function read(path)
     local file = assert(io.open(path, 'rb'), 'missing installed file: ' .. path)
@@ -25,19 +26,37 @@ local function ensureConfig(path, rows)
             if setting then
                 setting = setting:match('^%s*(.-)%s*$')
                 assert(not present[setting], 'duplicate Templates config key: ' .. setting)
-                present[setting] = true
+                present[setting] = index
             end
         end
     end
     assert(sections <= 1, 'duplicate Templates config section')
     if section == 'Templates' and not finish then finish = #lines + 1 end
-    local missing = {}
+    local missing, changed = {}, false
+    local function accepted(row, value)
+        if not value or value ~= value then return false end
+        if row.Type == 'integer' then
+            return value % 1 == 0 and value >= row.Minimum and value <= row.Maximum
+        end
+        for candidate in row.PresetValues:gmatch('[^|]+') do
+            if value == tonumber(candidate) then return true end
+        end
+        return false
+    end
     for _, row in ipairs(rows) do
-        if not present[row.Id] then
+        local index = present[row.Id]
+        if not index then
             missing[#missing + 1] = row.Id .. '=' .. string.format('%.17g', tonumber(row.Default))
+        else
+            local raw = lines[index]:match('=%s*([^;#]+)')
+            local value = raw and tonumber(raw:match('^%s*(.-)%s*$'))
+            if not accepted(row, value) then
+                lines[index] = row.Id .. '=' .. string.format('%.17g', tonumber(row.Default))
+                changed = true
+            end
         end
     end
-    if #missing == 0 then return false end
+    if #missing == 0 and not changed then return false end
     if not first then
         if #lines > 0 and lines[#lines] ~= '' then lines[#lines + 1] = '' end
         lines[#lines + 1] = '[Templates]'
@@ -62,40 +81,43 @@ local function ensureConfig(path, rows)
     end
     return true
 end
+local function readConfigValues(path)
+    local file = assert(io.open(path, 'rb'), 'missing installed config: ' .. path)
+    local content = file:read('*a'); file:close()
+    local values, section = {}, nil
+    for line in (content:gsub('\r\n', '\n'):gsub('\r', '\n') .. '\n'):gmatch('(.-)\n') do
+        local heading = line:match('^%s*%[([^%]]+)%]%s*$')
+        if heading then section = heading
+        elseif section == 'Templates' then
+            local key, value = line:match('^%s*([^=;#]+)%s*=%s*([^;#]+)')
+            if key then
+                key, value = key:match('^%s*(.-)%s*$'), tonumber(value:match('^%s*(.-)%s*$'))
+                assert(value ~= nil, 'invalid numeric Templates setting: ' .. key)
+                values[key] = value
+            end
+        end
+    end
+    return values
+end
 function M.start(root, settings, queue, log)
     local profile = assert(loadfile(root .. '/menu-profile.lua', 't', {}))()
     assert(profile.mode == 'menu-test', 'unsupported installed profile')
     local service
-    local te = TE.new({categoriesPath=root..'/categories.lua',templatesFolder=root..'/templates',
+    local inputHost
+    local categoryFiles = {}
+    for _, path in ipairs(profile.categories or {}) do
+        categoryFiles[#categoryFiles + 1] = root .. '/' .. path
+    end
+    local te = TE.new({categoriesFolder=root..'/Scripts/categories',
+        categoryFiles=categoryFiles, templatesFolder=root..'/Scripts',
         listFiles=function() return {} end,
         resolveTarget=function(category, context)
             if type(context)=='table' and type(context.targets)=='table' and context.targets[category]~=nil then
                 return context.targets[category]
             end
-            if category~='player.quickslots' or type(FindAllOf)~='function' then return nil end
-            local ok,objects=pcall(FindAllOf,'WBP_GameHUD_C')
-            if not ok or type(objects)~='table' then return nil end
-            for _,hud in ipairs(objects) do
-                if service:valid(hud) then
-                    local named,fullName=pcall(function() return hud:GetFullName() end)
-                    if named and tostring(fullName):find('/Engine/Transient',1,true) then
-                        local found,switcher=pcall(function() return hud.QuickslotsSwitcher end)
-                        if found and switcher~=nil then
-                            local unwrapped,value=pcall(function() return switcher:get() end)
-                            if unwrapped then switcher=value end
-                            if service:valid(switcher) then return switcher end
-                        end
-                    end
-                end
-            end
         end})
     for _, path in ipairs(profile.templates) do te:registerTemplate(root .. '/' .. path) end
     te:loadTemplatesFromRegister()
-    for _, entry in ipairs(te.registry.templates) do
-        if entry.template.category == 'player.quickslots' then
-            assert(entry.template.widgetRenderingEnabled == false, 'menu-test requires provider rendering disabled')
-        end
-    end
     local catalog = assert(loadfile(root .. '/identity-catalog.lua', 't', {}))()
     local menu = te:generateMenu({catalog=catalog,description=profile.description})
     assert(menu.aggregate.manifest == read(root .. '/mod_settings.ini'), 'template/schema changed; rebuild TE menu before restart')
@@ -126,13 +148,74 @@ function M.start(root, settings, queue, log)
         local parent = object:GetParent()
         return self:valid(parent) and parent or nil
     end
+    function service:findObject(path)
+        if type(FindAllOf) ~= 'function' then return nil end
+        return ObjectPaths.findLive(path, FindAllOf, function(object) return self:valid(object) end)
+    end
+    function service:activateQuickslot(kind, slot)
+        local field = kind == 'ability' and 'WBP_AA_Quickslots' or kind == 'consumable' and 'WBP_HUD_Quickslots' or nil
+        local names = {'Left', 'Top', 'Right', 'Bottom'}
+        if not field or not names[slot] or type(FindAllOf) ~= 'function' then return false end
+        local ok, huds = pcall(FindAllOf, 'WBP_GameHUD_C')
+        if not ok or type(huds) ~= 'table' then return false end
+        for _, hud in ipairs(huds) do
+            local named = self:valid(hud) and self:identity(hud) or ''
+            if named:find('/Engine/Transient', 1, true) then
+                local wheel = hud[field]
+                local button = wheel and wheel[names[slot]]
+                local unwrapped, value = pcall(function() return button:get() end)
+                if unwrapped then button = value end
+                if self:valid(button) then
+                    local clicked = pcall(function() button:BP_OnClicked() end)
+                    return clicked
+                end
+            end
+        end
+        return false
+    end
+    function service:selectQuickslotGroup(index)
+        if index ~= 1 and index ~= 2 or type(FindAllOf) ~= 'function' then return false end
+        local ok, huds = pcall(FindAllOf, 'WBP_GameHUD_C')
+        if not ok or type(huds) ~= 'table' then return false end
+        for _, hud in ipairs(huds) do
+            if self:valid(hud) and self:identity(hud):find('/Engine/Transient', 1, true) then
+                local switcher = hud.QuickslotsSwitcher
+                local unwrapped, value = pcall(function() return switcher:get() end)
+                if unwrapped then switcher = value end
+                if self:valid(switcher) then
+                    local selected = pcall(function() switcher:SetActiveWidgetIndex(index - 1) end)
+                    return selected
+                end
+            end
+        end
+        return false
+    end
+    inputHost = require('te.player_actions.ue4ss_host').new(queue, log,
+        te.categories:getCategory('player.quickslots'))
+    local initial = menu.decode(readConfigValues(root .. '/config.ini'))['player.quickslots']
+    if initial and initial.id then
+        local template = assert(te.registry.byId[initial.id], 'persisted Quickslots template is unavailable').template
+        local bound, why = inputHost:apply(template, initial.configuration, service)
+        if bound then log('Persisted Quickslots template input is active.')
+        else log('Persisted Quickslots template input pending: ' .. tostring(why)) end
+    else
+        inputHost:deactivate()
+    end
     local routed = {subscribe=function(provider, callback)
         return settings.subscribe(provider, function(event) queue(function() callback(event) end) end)
     end}
     te:subscribeApplied(routed, menu, function()
         return {playerActions=service, services={['menu.templates']={}}}
     end, function(ok, errors)
-        if ok then log('Committed template settings received; gameplay binding/visual cutover is disabled.')
+        if ok then
+            local id, configuration = te.runtime:selection('player.quickslots')
+            if not id then inputHost:deactivate(); log('Quickslots template cleared; restored native input actions.')
+            else
+                local template = te.registry.byId[id].template
+                local bound, why = inputHost:apply(template, configuration, service)
+                if bound then log('Committed template settings received; replacement quickslots bindings are active.')
+                else log('Quickslots bindings pending: ' .. tostring(why)) end
+            end
         elseif type(errors)=='table' then
             for category, message in pairs(errors) do log(category .. ': ' .. tostring(message)) end
         else log('Apply failed: ' .. tostring(errors)) end

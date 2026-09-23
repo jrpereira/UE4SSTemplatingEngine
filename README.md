@@ -1,37 +1,38 @@
 # UE4SS Templating Engine
 
+I started my short modding looking to fix the QuickslotWheel's issues, but along the way bumped into many situations where it felt like I had to build some foundational stuff, and I started to consider how much time wasted we could be saving, and how much developer creativity we could help emerge.
+
+For instance, it took some days to find my way through UE's GUI infrastructure, find items, manage their lifecycle, learn Enhanced Input in depth, etc. So, encapsulating away those learnings into a well tested base... that's how this module was born.
+
+For example, there's core functionality that allows players to take their pick on a variety of keyboard alternatives that really aren't that many, and ultimately are just presets. You can design and deploy dozens of formats, and they'll all use a variation of that. This means players can download and experiment, from different authors... and their choice of keys will carry across. Seems like a small thing, it's not. :D
+
+
+
 TE lets mods describe alternative implementations of game features as Lua templates. Players can then select one template for each supported category from the mod menu.
 
 ## Example: replace the quickslots
 
-Create `templates/my_quickslots.lua`:
+Create `<Module>/Scripts/my_quickslots.lua`:
 
 ```lua
 local template = {
     name = "My Quickslots",
     category = "player.quickslots",
     settings = { target = "module", enabled = false },
-    contexts = { "combat", "openworld" },
-    events = { "GroupSelected", "SlotActivated" },
-
-    actions = {
-        { name = "Abilities",   slots = 4, type = "ability" },
-        { name = "Consumables", slots = 4, type = "consumable" },
-    },
 }
 
-function template:attach(service, target, settings, previous)
+function template:attach(service, target, configuration, previous, categoryHandle)
     -- Prepare the replacement and return an opaque state handle.
     -- Reusing `previous` makes repeated Apply operations idempotent.
     return previous or { original = {} }
 end
 
-function template:render(service, state, target, reason)
+function template:render(service, state, target, reason, categoryHandle)
     -- Update a target discovered by TE, such as the wheel layout or HUD indicators.
     return "applied" -- or "not_ready" / "ignored"
 end
 
-function template:detach(service, state, reason)
+function template:detach(service, state, reason, categoryHandle)
     -- Restore every game value recorded by attach/render.
     return true
 end
@@ -39,20 +40,23 @@ end
 return template
 ```
 
-Register the file directly, or register every `.lua` file in a folder:
+Register the template entry point directly:
 
 ```lua
-te:registerTemplate("templates/my_quickslots.lua")
-te:registerTemplates("templates")
+te:registerTemplate("<Module>/Scripts/my_quickslots.lua")
 ```
+
+`registerTemplates(folder)` is available when a folder contains only template entry points. It registers every `.lua` file returned by the host's nonrecursive `listFiles` adapter.
 
 Once templates are loaded, TE validates them, adds them to the mod menu, and remembers the active template for each category. It invokes lifecycle methods only while the selected template has `settings.enabled = true`.
 
 The `Templates` DMM page always aggregates every loaded template. A template may declare `single = true` or `single = false`; when it omits the field, TE copies the category's `single` value as its fallback. Templates sharing a category must resolve to the same value. A single category has one template picker. Other categories show one Yes/No picker per template and may activate several templates at once.
 
-Every template also declares its menu target with `settings.target`. Generated pages after `Templates` are grouped by category, such as `Player Quickslots` and `NPC Attacks`; every template in a category shares the appropriate category page.
+Every template also declares its menu target with `settings.target`. A `templates` target is routed to a category page, such as `Player Quickslots` or `NPC Attacks`. A `module` target is routed to its source module's page: register it from `<Module>/Scripts/<file>.lua` or `<Module>/Scripts/templates/<file>.lua`, which produces a `<Module>` Mod Menu page. Existing `<Module>/templates/<file>.lua` registrations remain accepted during migration.
 
-Generated key bindings follow AMM's mode-owned pairing contract. The mode picker survives as the composite row, uses `ammType=tab`, and declares `Pair=<key-setting-id>`. The integer key setting uses `ammType=keybind` without `Pair`; its normal DMM visibility determines whether the key component appears. Group-first input gives the first group a `Default` choice (`-1`) that inherits the prior behavior and disables its custom key capture; later group bindings keep Tap and sustain-style Hold choices.
+Generated key bindings follow AMM's mode-owned pairing contract. The mode picker survives as the composite row, uses `ammType=tab`, and declares `Pair=<key-setting-id>`. The integer key setting uses `ammType=keybind` without `Pair`; its normal DMM visibility determines whether the key component appears. Group-first input gives the first group a `Default` choice (`-1`) that disables its custom key capture; later group bindings keep Tap and sustain-style Hold choices.
+
+In group-first mode, TE maps `configuration.shared` to `IA_SharedSlot*` actions and dispatches each slot through the selected group. Bridge callbacks must bind before TE activates its mapping contexts or gates native quickslot actions. Binding failure leaves native input available.
 
 ## Template format
 
@@ -62,19 +66,36 @@ Each template needs:
 - `category`: the game feature it replaces.
 - `attach`, `render`, and `detach`: the runtime lifecycle.
 
-Categories may require extra data. `player.quickslots`, for example, requires an ordered `actions` array. Each action group declares its display name, slot count, and semantic type. TE uses that information to generate direct-slot or group-first key bindings without hard-coding a particular quickslot layout.
+Category objects live in `Scripts/categories/*.lua`. TE loads every category object at startup; each file declares its own `name`, and `single = true` when the category allows one selected template. Other modules can add categories with `te:loadCategory(name, path)` before loading their templates. `player.quickslots` declares ordered slot actions with `type` and `slot`, plus shared `contexts`. TE groups those actions by type to generate direct-slot and group-first key bindings. Templates reference the category by name; they do not need their own `actions` or `contexts` fields.
 
-Templates declare the category events they consume with `events`. TE validates those names against the category contract, subscribes once through its event host, and delivers only declared events. The callback remains `render(service, handle, payload, eventName)`. If the selected template is waiting for native objects, a declared event retries `attach` before delivery. QSF currently declares `GroupSelected` and `SlotActivated`; it does not register those native hooks itself.
+A category may define `resolveTarget`, `attach`, and `detach`. TE calls category `attach(service, target, configuration, previousCategoryHandle, template)` before the selected template's `attach`, then passes the returned category handle as the last argument to the template's `attach`, `render`, and `detach`. On a template switch, TE detaches the old template while keeping the category attached; when the category is cleared, it detaches the template first and the category second. A category author decides what its hooks create, retain, and restore.
+
+The quickslots category declares one stable UE object path for `QuickslotsSwitcher`; TE resolves its live instance despite generated IDs in the outer path. Templates that set `detachSecondaryWheel = true` ask the category to move the second wheel out of the switcher. The category handle then contains `primary` and `secondary` wheel references. Its `detach` restores the secondary wheel and its original slot when the category is cleared. Templates without that flag keep the existing wheel hierarchy.
+
+Category objects can declare `events`. TE validates those names against the category contract, subscribes once through its event host, and delivers declared events to the selected template. The callback remains `render(service, handle, payload, eventName)`. If the selected template is waiting for native objects, a declared event retries `attach` before delivery. The quickslots category declares `GroupSelected` and `SlotActivated`; templates receive those events through TE.
 
 Creation-driven categories declare independent native targets with `subscribe = { { path = "/Game/.../WBP_CombatTargetIndicator_C", events = { "created" }, contexts = { "combat" } } }`. TE validates the exact path, event, and context, owns `NotifyOnNewObject` and game-thread scheduling through `te.native_events`, passes the active GameHUD parent to `attach`, and passes each created indicator to `render` with event name `created`. The template service does not expose subscription, unsubscription, or scheduling methods.
 
-A template file may return one template or a nested array of templates. Template files are ordinary Lua and can access the environment in which the host loads them, so install templates only from sources you trust.
+A template file may return one template, an array of templates, or a header followed by either form. The header is copied into every template before validation. A field declared on a template takes precedence over the same header field; table fields such as `settings` are replaced as a whole.
+
+```lua
+local header = {
+    category = 'menu.fixes',
+    settings = {target = 'templates', enabled = false},
+}
+return header, {
+    {name = 'First fix'},
+    {name = 'Second fix'},
+}
+```
+
+Template files are ordinary Lua and can access the environment in which the host loads them, so install templates only from sources you trust.
 
 `attach` is called on activation and again when settings are applied. It should be idempotent and preserve the original game state. `render` responds to relevant discovered widgets or events. `detach` runs while objects are still valid and must restore owned changes. TE skips all three methods when `settings.enabled = false`. When the world is already invalid, TE forgets the active handle without calling template code.
 
-The `player.quickslots` service exposes `valid`, `same`, `identity`, and `parent`. A quickslots template calls these methods directly. TE resolves the current QuickslotsSwitcher and invokes `attach(service, target, configuration, previousHandle)` only when that target is valid. If it is unavailable, TE keeps the selection pending without calling template code. A declared category event retries the attachment with its resolved target, then invokes `render(service, handle, target, eventName)`. Handles retain provider-owned mutation and restoration state; templates do not rediscover or retain the category parent merely for later rendering.
+The `player.quickslots` service exposes `valid`, `same`, `identity`, and `parent`. A quickslots template calls these methods directly. TE resolves the current QuickslotsSwitcher and invokes `attach(service, target, configuration, previousHandle, categoryHandle)` only when that target is valid. If it is unavailable, TE keeps the selection pending without calling template code. A declared category event retries the attachment with its resolved target, then invokes `render(service, handle, target, eventName)`. Handles retain provider-owned mutation and restoration state; templates do not rediscover or retain the category parent merely for later rendering.
 
-Every template declares `settings.target` (`"templates"` or `"module"`) and a boolean `settings.enabled`, merging `groups` and `fields` into that table when it exposes menu controls. A settings group may declare `heading = false` to keep its grouping and order without rendering a separator. Bundled templates default `enabled` to `true`, while a fresh configuration still keeps each category selector at `None`; a template begins running only after it is selected. A disabled template may remain selected, but TE records it without calling `attach`, `render`, or `detach`. TE validates committed `configuration.settings` values against any declared fields before invoking enabled lifecycle code. Templates can import `require("te.widget")` for generic UE widget operations: `unwrap`, `property`, `number`, `translation`, `scale`, `opacity`, `setTranslation`, `setScale`, `setOpacity`, `snapshotSlot`, and `restoreSlot`. Layout policy, widget ownership, restoration journals, and category behavior stay in the template.
+Every template declares `settings.target` (`"templates"` or `"module"`) and a boolean `settings.enabled`, merging `groups` and `fields` into that table when it exposes menu controls. A settings group may declare `heading = false` to keep its grouping and order without rendering a separator. Bundled templates default `enabled` to `true`, while a fresh configuration still keeps each category selector at `None`; a template begins running only after it is selected. A disabled template may remain selected, but TE records it without calling `attach`, `render`, or `detach`. TE validates committed `configuration.settings` values against any declared fields before invoking enabled lifecycle code. Templates can import `require("te.widget")` for generic UE widget operations: `unwrap`, `property`, `number`, `translation`, `scale`, `opacity`, `setTranslation`, `setScale`, `setOpacity`, `snapshotSlot`, and `restoreSlot`. The category owns shared target discovery and hierarchy changes; each template owns its visual layout and restoration of its own changes.
 
 ## Built-in categories
 

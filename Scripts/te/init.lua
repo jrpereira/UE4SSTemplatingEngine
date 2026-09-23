@@ -3,6 +3,7 @@ local Registry = require('te.registry')
 local Lifecycle = require('te.lifecycle')
 local Menu = require('te.menu')
 local Events = require('te.event_contracts')
+local CategoryFiles = require('te.category_files')
 local M = {}
 
 -- Host supplies discovery, native scheduling/readiness and configuration storage.
@@ -10,14 +11,33 @@ local M = {}
 function M.new(options)
     assert(type(options) == 'table', 'host options required')
     local categories = Categories.new()
-    local core = options.coreCategories or assert(loadfile(options.categoriesPath or 'categories.lua', 't'))()
-    core(function(...) categories:registerCategory(...) end,
-        function(...) return categories:setCategory(...) end)
+    local categoryFolder = options.categoriesFolder or 'Scripts/categories'
+    local function loadCategory(path, expected)
+        local definition = assert(loadfile(path, 't'))()
+        assert(type(definition) == 'table', path .. ': expected category object')
+        assert(type(definition.name) == 'string' and definition.name:find('%S'),
+            path .. ': category object must declare name')
+        assert(expected == nil or expected == definition.name,
+            path .. ': category name does not match registration')
+        assert(definition.count == nil and definition.templates == nil and definition.visible == nil,
+            path .. ': category runtime state cannot be declared')
+        assert((definition.attach == nil and definition.detach == nil)
+            or (type(definition.attach) == 'function' and type(definition.detach) == 'function'),
+            path .. ': category attach and detach must both be functions')
+        assert(definition.resolveTarget == nil or type(definition.resolveTarget) == 'function',
+            path .. ': category resolveTarget must be a function')
+        return categories:addCategory(definition)
+    end
+    local paths = (options.listCategoryFiles or CategoryFiles.list)(categoryFolder, options.categoryFiles)
+    for _, path in ipairs(paths) do
+        loadCategory(path)
+    end
     local registry = Registry.new(categories, options)
     local runtime = Lifecycle.new(registry, {resolveService=options.resolveService,resolveTarget=options.resolveTarget})
     local self = {registry = registry, categories = categories, runtime = runtime}
     function self:registerCategory(...) return categories:registerCategory(...) end
     function self:setCategory(...) return categories:setCategory(...) end
+    function self:loadCategory(name, path) return loadCategory(path, name) end
     function self:registerTemplate(...) return registry:registerTemplate(...) end
     function self:registerTemplates(...) return registry:registerTemplates(...) end
     function self:loadTemplatesFromRegister() return registry:loadTemplatesFromRegister() end
@@ -74,7 +94,9 @@ function M.new(options)
         local requested = {}
         for _, entry in ipairs(registry.templates) do
             local category = entry.template.category
-            for _,event in ipairs(Events.declarations(category,entry.template.events,entry.template.subscribe,entry.location)) do
+            local definition = categories:getCategory(category)
+            for _,event in ipairs(Events.declarations(category,definition.events or entry.template.events,
+                entry.template.subscribe,entry.location)) do
                 requested[category..'\0'..event.name..'\0'..(event.path or '')..'\0'..
                     table.concat(event.contexts or {},'\0')]={category=category,event=event}
             end
@@ -109,7 +131,7 @@ function M.new(options)
             if self.unsubscribeEvents == unsubscribe then unsubscribe(); self.unsubscribeEvents=nil end
         end
     end
-    self:registerTemplates(options.templatesFolder or 'templates')
+    self:registerTemplates(options.templatesFolder or 'Scripts')
     return self
 end
 

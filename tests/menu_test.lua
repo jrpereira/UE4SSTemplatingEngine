@@ -244,23 +244,46 @@ for i=1,2 do routedTemplates[#routedTemplates+1]=routedAttack('Module One',i) en
 for i=1,4 do routedTemplates[#routedTemplates+1]=routedQuick('Other Modules',i) end
 for i=1,4 do routedTemplates[#routedTemplates+1]=routedAttack('Other Modules',i) end
 local routedRegistry=Registry.new(routedCategories,{execute=function()return routedTemplates end})
-routedRegistry:registerTemplate('routed.lua');routedRegistry:loadTemplatesFromRegister()
+routedRegistry:registerTemplate('ExampleModule/Scripts/routed.lua');routedRegistry:loadTemplatesFromRegister()
 local routed=Menu.generate(routedRegistry)
-check(#routed.aggregate.rows==7 and #routed.pages==2 and next(routed.pageByModule)==nil)
+check(#routed.aggregate.rows==7 and #routed.pages==1 and next(routed.pageByCategory)==nil)
 check(#routed.multiSelectors['npc.attacks']==6)
 local routedSelector=routed.selectors['player.quickslots']
 local routedSelectorRow
 for _,item in ipairs(routed.aggregate.rows) do if item.Id==routedSelector.id then routedSelectorRow=item end end
 local choices=0 for _ in routedSelectorRow.PresetValues:gmatch('[^|]+') do choices=choices+1 end
 check(choices==6)
-local quickPage=assert(routed.pageByCategory['player.quickslots'])
-local attackPage=assert(routed.pageByCategory['npc.attacks'])
-check(quickPage.name=='Player Quickslots' and quickPage.category=='player.quickslots'
-    and attackPage.name=='Npc Attacks' and attackPage.category=='npc.attacks')
-local quickControls,attackControls=0,0
-for _,item in ipairs(quickPage.rows) do if item._control then quickControls=quickControls+1 end end
-for _,item in ipairs(attackPage.rows) do if item._control then attackControls=attackControls+1 end end
-check(quickControls==1 and attackControls==6)
+local quickslots=assert(routed.pageByModule.ExampleModule)
+check(quickslots.name=='ExampleModule' and quickslots.module=='ExampleModule')
+local controls, details=0, 0
+for _,item in ipairs(quickslots.rows) do
+    if item._control then controls=controls+1
+    elseif not item._routeHidden then details=details+1 end
+end
+check(controls==7 and details>0)
+local legacyRegistry=Registry.new(routedCategories,{execute=function()
+    return routedQuick('Module One',1)
+end})
+legacyRegistry:registerTemplate('ExampleModule/templates/routed.lua')
+legacyRegistry:loadTemplatesFromRegister()
+local legacy=Menu.generate(legacyRegistry,{catalog=routed.catalog})
+check(legacy.pageByModule.ExampleModule~=nil)
+local migratedRegistry=Registry.new(routedCategories,{execute=function()
+    return routedQuick('Module One',1)
+end})
+migratedRegistry:registerTemplate('ExampleModule/Scripts/routed.lua')
+migratedRegistry:loadTemplatesFromRegister()
+local migrated=Menu.generate(migratedRegistry,{catalog=routed.catalog})
+check(migrated.pageByModule.ExampleModule~=nil
+    and migrated.selectors['player.quickslots'].id==legacy.selectors['player.quickslots'].id)
+local nestedRegistry=Registry.new(routedCategories,{execute=function()
+    return routedQuick('Module One',1)
+end})
+nestedRegistry:registerTemplate('ExampleModule/Scripts/templates/main.lua')
+nestedRegistry:loadTemplatesFromRegister()
+local nested=Menu.generate(nestedRegistry,{catalog=routed.catalog})
+check(nested.pageByModule.ExampleModule~=nil
+    and nested.selectors['player.quickslots'].id==legacy.selectors['player.quickslots'].id)
 local bad = fixture(2); bad.name = 'Injected\n[Setting.Bad]'
 rejects(function() Menu.generate(registryFor(bad)) end, 'unsupported separators')
 bad = fixture(2); bad.actions = {Only = bad.actions[1]}
