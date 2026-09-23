@@ -590,10 +590,19 @@ function M.generate(registry, options)
     end
     local function routedRows(categories, owned)
         local selected = {}
+        local category = next(categories)
+        local headerSelector = category and next(categories, category) == nil
+            and selectors[category] and selectors[category].id
         for _, item in ipairs(rows) do
             if categories[item._category] then
                 if item._control or (item._owner and owned[item._owner]) then
-                    selected[#selected + 1] = item
+                    if item.Id == headerSelector then
+                        local header = U.copy(item)
+                        header.ammLevel = 1
+                        selected[#selected + 1] = header
+                    else
+                        selected[#selected + 1] = item
+                    end
                 elseif item._owner then
                     local hidden, control = U.copy(item), assert(ownerControls[item._owner])
                     hidden._routeHidden, hidden._hideWhen, hidden._hideValue = true, control.id, control.impossible

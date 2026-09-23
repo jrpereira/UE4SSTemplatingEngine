@@ -56,6 +56,9 @@ for _, last in ipairs({2, 5}) do
     local model, indices = modelFor(result, 'player.quickslots')
     local rowsById = {}; for _, item in ipairs(result.rows) do rowsById[item.Id] = item end
     local selector = result.selectors['player.quickslots']
+    check(result.aggregate.rows[1].ammLevel == 2
+        and result.pageByCategory['player.quickslots'].rows[1].ammLevel == 1)
+    check(model.items[indices[selector.id]].ammHeader)
     local selected = next(selector.byValue)
     local definition = result.definitions['player.quickslots'][selected]
     local scopePrefix = 'TE_'
@@ -92,7 +95,7 @@ for _, last in ipairs({2, 5}) do
         check(model.items[indices[definition.direct['2'][slot].key]].default == 48 + slot)
         check(model.items[indices[definition.direct['2'][slot].mode]].default == 1)
     end
-    check(model.items[indices[selector.id]].ammFont == 2)
+    check(model.items[indices[selector.id]].ammFont == 1)
     check(model.items[indices[definition.access]].ammFont == 2)
     check(model.items[indices[selector.id]].ammGroup.heading == false)
     check(model.items[indices[definition.access]].ammGroup.heading == false)
