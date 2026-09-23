@@ -54,7 +54,7 @@ function M.normalize(declaration)
     for index, source in ipairs(declaredFields) do
         assert(type(source) == 'table', 'provider field must be a table')
         allowed(source, {id=true,label=true,group=true,type=true,order=true,default=true,values=true,
-            labels=true,min=true,max=true,step=true,suffix=true,tab=true,level=true,description=true,
+            labels=true,min=true,max=true,step=true,suffix=true,tab=true,tabNavigation=true,level=true,description=true,
             after=true,visibleWhen=true,visibleValues=true}, 'provider field')
         identifier(source.id, 'provider field id'); text(source.label, 'provider field label')
         level(source.level, source.type == 'picker' or source.type == 'navigation')
@@ -75,6 +75,8 @@ function M.normalize(declaration)
         assert(field.after == nil or field.after == 'AccessMethod',
             'provider field after must be AccessMethod')
         assert(field.tab == nil or type(field.tab) == 'boolean', 'provider tab must be boolean')
+        assert(field.tabNavigation == nil or (field.tabNavigation == 0 or field.tabNavigation == 1),
+            'provider tabNavigation must be 0 or 1')
         if field.type == 'integer' then
             assert(field.values == nil and field.labels == nil and not field.tab, 'integer cannot declare choices/tabs')
             field.step = field.step or 1

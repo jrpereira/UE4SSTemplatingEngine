@@ -145,7 +145,7 @@ local navigationFixture=fixture(2,'Navigation')
 navigationFixture.settings.groups={{id='Views',label='Views',heading=false}}
 navigationFixture.settings.fields={
     {id='View',type='navigation',group='Views',label='View',values={0,1},
-        labels={'More','Primary'},default=0,tab=true,level=2},
+        labels={'More','Primary'},default=0,tab=true,tabNavigation=1,level=2},
     {id='Offset',type='integer',group='Views',label='Offset',min=-10,max=10,
         step=1,default=0,visibleWhen='View',visibleValues={1}},
 }
@@ -160,8 +160,9 @@ for _,item in ipairs(navigationPage.rows) do
     if item.Id==navigationDef.navigation.View then navigationRow=item
     else navigationValues[item.Id]=tonumber(item.Default) end
 end
-check(navigationRow and navigationRow.ammNavigation==1
+check(navigationRow and navigationRow.ammNavigation==1 and navigationRow.tabNavigation==1
     and navigationRow.ConfigFile==nil and navigationRow.ConfigKey==nil)
+check(navigationPage.manifest:find('tabNavigation=1',1,true))
 navigationValues[navigationMenu.selectors['player.quickslots'].id]=navigationValue
 check(navigationPage.decode(navigationValues)['player.quickslots'].settings.View==nil)
 local baseRegistry = registryFor(fixture(2))

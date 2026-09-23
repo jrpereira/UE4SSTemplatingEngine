@@ -132,11 +132,12 @@ invalid(function(d) d.enabled='yes' end,'settings.enabled must be boolean')
 local navigation={target='module',enabled=true,
     groups={{id='Views',label='Views',heading=false}},fields={
         {id='View',type='navigation',group='Views',label='View',values={0,1},
-            labels={'More','Primary'},default=0,tab=true,level=2},
+            labels={'More','Primary'},default=0,tab=true,tabNavigation=1,level=2},
         {id='Offset',type='integer',group='Views',label='Offset',min=-10,max=10,step=1,
             default=0,visibleWhen='View',visibleValues={1}},
     }}
 check(#P.normalize(navigation)==1)
+check(P.normalize(navigation)[1].fields[1].tabNavigation==1)
 check(P.validate(navigation,{Offset=3}).Offset==3)
 rejects(function() P.validate(navigation,{View=1,Offset=3}) end,'unknown provider setting')
 invalid(function(d) d.fields[1].type='navigation';d.fields[1].tab=false;

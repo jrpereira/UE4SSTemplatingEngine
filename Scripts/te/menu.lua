@@ -222,7 +222,8 @@ function M.generate(registry, options)
                     local settingId = namedId(publicName(category) .. publicName(field.id),
                         {'category_provider', category, field.id})
                     local metadata = {Id=settingId, Label=field.label, Group=groupId, Type=field.type,
-                        Default=field.default, Description=field.description, ammLevel=field.level}
+                        Default=field.default, Description=field.description, ammLevel=field.level,
+                        tabNavigation=field.tabNavigation}
                     if field.type == 'picker' then
                         metadata.PresetValues = table.concat(field.values, '|')
                         metadata.PresetLabels = table.concat(field.labels, '|')
@@ -351,7 +352,8 @@ function M.generate(registry, options)
                                 local metadata = {Id=settingId, Label=field.label, Group=groupId,
                                     Type=navigation and 'picker' or field.type,
                                     Default=field.default, Description=field.description, ammLevel=field.level,
-                                    ammNavigation=navigation and 1 or nil}
+                                    ammNavigation=navigation and 1 or nil,
+                                    tabNavigation=field.tabNavigation}
                                 if field.visibleWhen then
                                     local sourceId = definition.settings[field.visibleWhen]
                                         or definition.navigation[field.visibleWhen]
