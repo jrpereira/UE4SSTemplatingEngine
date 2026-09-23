@@ -13,7 +13,7 @@ local declaration={target='templates',enabled=true,groups={
     {id='Visuals',label='Visuals',level=4,order=1,heading=false},
 },fields={
     {id='WheelsDisplayed',type='picker',values={1,2},labels={'One','Two'},default=2,
-        label='Wheels Displayed',group='Visuals',order=1,tab=true,level=1,after='AccessMethod'},
+        label='Wheels Displayed',group='Visuals',order=1,tab=true,level=2,after='AccessMethod'},
     {id='PrimaryWheel',type='picker',values={0,1},labels={'Consumables','Abilities'},default=0,
         label='Primary Wheel',group='Visuals',order=2,tab=true,level=4},
 }}
@@ -57,8 +57,8 @@ check(index[provider.WheelsDisplayed]>index[def.access])
 check(index[provider.WheelsDisplayed]<index[provider.PrimaryWheel])
 check(index[provider.PrimaryOpacity]<index[provider.SecondaryX])
 check(items[index[provider.WheelsDisplayed]].ammTabs and items[index[provider.PrimaryX]].ammGroup.font==4)
-check(items[index[provider.WheelsDisplayed]].ammHeader
-    and items[index[provider.WheelsDisplayed]].ammFont==1)
+check(not items[index[provider.WheelsDisplayed]].ammHeader
+    and items[index[provider.WheelsDisplayed]].ammFont==2)
 check(items[index[provider.WheelsDisplayed]].ammGroup.heading==false
     and items[index[provider.PrimaryWheel]].ammGroup.heading==false)
 check(items[index[provider.PrimarySize]].suffix=='%')
@@ -127,8 +127,20 @@ invalid(function(d) d.fields[3].visibleWhen='WheelsDisplayed';d.fields[3].visibl
 invalid(function(d) d.fields[3].visibleWhen='WheelsDisplayed';d.fields[3].visibleValues={1,1} end,
     'distinct source choice')
 invalid(function(d) d.fields[3].level=1 end,'level 1 requires a picker')
-invalid(function(d) d.fields[2].level=1 end,'only one level-1 picker')
+invalid(function(d) d.fields[1].level=1;d.fields[2].level=1 end,'only one level-1 picker')
 invalid(function(d) d.enabled='yes' end,'settings.enabled must be boolean')
+local navigation={target='module',enabled=true,
+    groups={{id='Views',label='Views',heading=false}},fields={
+        {id='View',type='navigation',group='Views',label='View',values={0,1},
+            labels={'More','Primary'},default=0,tab=true,level=2},
+        {id='Offset',type='integer',group='Views',label='Offset',min=-10,max=10,step=1,
+            default=0,visibleWhen='View',visibleValues={1}},
+    }}
+check(#P.normalize(navigation)==1)
+check(P.validate(navigation,{Offset=3}).Offset==3)
+rejects(function() P.validate(navigation,{View=1,Offset=3}) end,'unknown provider setting')
+invalid(function(d) d.fields[1].type='navigation';d.fields[1].tab=false;
+    d.fields[1].values=nil end,'provider picker values')
 local file=assert(io.open('outputs/example-provider-mod_settings.ini','wb'))
 file:write(menu.manifest);file:close()
 print('provider settings: '..checks..' checks passed')

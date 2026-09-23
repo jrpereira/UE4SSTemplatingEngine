@@ -141,6 +141,29 @@ for _, last in ipairs({2, 5}) do
     values[definition.shared[1].key] = 255
     rejects(function() result.decode(values) end, 'invalid key')
 end
+local navigationFixture=fixture(2,'Navigation')
+navigationFixture.settings.groups={{id='Views',label='Views',heading=false}}
+navigationFixture.settings.fields={
+    {id='View',type='navigation',group='Views',label='View',values={0,1},
+        labels={'More','Primary'},default=0,tab=true,level=2},
+    {id='Offset',type='integer',group='Views',label='Offset',min=-10,max=10,
+        step=1,default=0,visibleWhen='View',visibleValues={1}},
+}
+local navigationMenu=Menu.generate(registryFor(navigationFixture))
+local navigationPage=assert(navigationMenu.pageByCategory['player.quickslots'])
+local navigationValue=next(navigationMenu.selectors['player.quickslots'].byValue)
+local navigationDef=navigationMenu.definitions['player.quickslots'][navigationValue]
+check(navigationDef.navigation.View and navigationDef.settings.View==nil)
+local navigationRow
+local navigationValues={}
+for _,item in ipairs(navigationPage.rows) do
+    if item.Id==navigationDef.navigation.View then navigationRow=item
+    else navigationValues[item.Id]=tonumber(item.Default) end
+end
+check(navigationRow and navigationRow.ammNavigation==1
+    and navigationRow.ConfigFile==nil and navigationRow.ConfigKey==nil)
+navigationValues[navigationMenu.selectors['player.quickslots'].id]=navigationValue
+check(navigationPage.decode(navigationValues)['player.quickslots'].settings.View==nil)
 local baseRegistry = registryFor(fixture(2))
 local initial = Menu.generate(baseRegistry)
 local more = Menu.generate(registryFor({fixture(2, 'AAA'), fixture(2)}), {catalog = initial.catalog})
