@@ -26,7 +26,9 @@ for _, role in ipairs({'Primary','Secondary'}) do
         if name=='Opacity' then min,max,step=0,100,5 end
         local id=role..name
         declaration.fields[#declaration.fields+1]={id=id,type='integer',min=min,max=max,step=step,
-            default=defaults[id],label=name,group=role,order=i,suffix=step==5 and '%' or nil}
+            default=defaults[id],label=name,group=role,order=i,suffix=step==5 and '%' or nil,
+            visibleWhen=id=='SecondaryX' and 'WheelsDisplayed' or nil,
+            visibleValues=id=='SecondaryX' and {2} or nil}
     end
 end
 local template={name='Visuals',category='player.quickslots',
@@ -61,7 +63,14 @@ check(items[index[provider.PrimarySize]].suffix=='%')
 model:set(index[selector.id],value)
 model:set(index[provider.WheelsDisplayed],1)
 local visibility=model:visibility()
-for _, settingId in pairs(provider) do check(visibility[index[settingId]]) end
+for name, settingId in pairs(provider) do
+    check(visibility[index[settingId]] == (name~='SecondaryX'))
+end
+local secondaryX=assert(page.rows[index[provider.SecondaryX]])
+check(secondaryX.VisibleWhen==provider.WheelsDisplayed and secondaryX.VisibleValues=='2')
+model:set(index[provider.WheelsDisplayed],2)
+check(model:visibility()[index[provider.SecondaryX]])
+model:set(index[provider.WheelsDisplayed],1)
 local values={}; for i,item in ipairs(items) do values[item.id]=model.pending[i] end
 local spec=menu.decode(values)['player.quickslots'].settings
 check(spec.WheelsDisplayed==1 and spec.PrimaryWheel==0)
@@ -102,7 +111,19 @@ invalid(function(d) d.fields[3].step=0 end,'range/step')
 invalid(function(d) d.fields[3].default=1001 end,'outside range')
 invalid(function(d) d.fields[3].min=-math.huge end,'integer min required')
 invalid(function(d) d.fields[3].type='custom' end,'unsupported provider field type')
-invalid(function(d) d.fields[1].visibleWhen='PrimaryWheel' end,'unsupported property')
+invalid(function(d) d.fields[1].visibleWhen='PrimaryWheel' end,'requires both')
+invalid(function(d) d.fields[1].visibleWhen='Missing';d.fields[1].visibleValues={1} end,
+    'source must be a picker')
+invalid(function(d) d.fields[1].visibleWhen='WheelsDisplayed';d.fields[1].visibleValues={2} end,
+    'cannot hide itself')
+invalid(function(d) d.fields[3].visibleWhen='SecondaryX';d.fields[3].visibleValues={40} end,
+    'source must be a picker')
+invalid(function(d) d.fields[3].visibleWhen='WheelsDisplayed';d.fields[3].visibleValues={} end,
+    'must not be empty')
+invalid(function(d) d.fields[3].visibleWhen='WheelsDisplayed';d.fields[3].visibleValues={3} end,
+    'distinct source choice')
+invalid(function(d) d.fields[3].visibleWhen='WheelsDisplayed';d.fields[3].visibleValues={1,1} end,
+    'distinct source choice')
 invalid(function(d) d.fields[1].level=1 end,'level 1 is reserved')
 invalid(function(d) d.enabled='yes' end,'settings.enabled must be boolean')
 local file=assert(io.open('outputs/example-provider-mod_settings.ini','wb'))

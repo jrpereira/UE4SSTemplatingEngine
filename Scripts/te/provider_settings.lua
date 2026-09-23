@@ -54,15 +54,18 @@ function M.normalize(declaration)
         assert(type(source) == 'table', 'provider field must be a table')
         allowed(source, {id=true,label=true,group=true,type=true,order=true,default=true,values=true,
             labels=true,min=true,max=true,step=true,suffix=true,tab=true,level=true,description=true,
-            after=true}, 'provider field')
+            after=true,visibleWhen=true,visibleValues=true}, 'provider field')
         identifier(source.id, 'provider field id'); text(source.label, 'provider field label'); level(source.level)
         assert(not fields[source.id], 'duplicate provider field ' .. source.id)
-        fields[source.id] = true
+        fields[source.id] = source
         local group = assert(byId[source.group], 'undeclared provider group: ' .. tostring(source.group))
         local field = U.copy(source)
         field.order, field.index = order(source.order,index), index
         if field.description ~= nil then text(field.description, 'provider description') end
         if field.suffix ~= nil then text(field.suffix, 'provider suffix') end
+        if field.visibleWhen ~= nil then identifier(field.visibleWhen, 'provider visibility source') end
+        assert((field.visibleWhen == nil) == (field.visibleValues == nil),
+            'provider visibility requires both visibleWhen and visibleValues')
         assert(field.after == nil or field.after == 'AccessMethod',
             'provider field after must be AccessMethod')
         assert(field.tab == nil or type(field.tab) == 'boolean', 'provider tab must be boolean')
@@ -90,6 +93,25 @@ function M.normalize(declaration)
             assert(finite(field.default) and seen[field.default], 'provider default must match a choice')
         else error('unsupported provider field type: ' .. tostring(field.type)) end
         group.fields[#group.fields+1] = field
+    end
+    for _, group in ipairs(groups) do
+        for _, field in ipairs(group.fields) do
+            if field.visibleWhen then
+                assert(field.visibleWhen ~= field.id, 'provider field cannot hide itself')
+                local source = fields[field.visibleWhen]
+                assert(source and source.type == 'picker',
+                    'provider visibility source must be a picker in the same template')
+                local count = U.array(field.visibleValues, 'provider visibility values')
+                assert(count > 0, 'provider visibility values must not be empty')
+                local choices, seen = {}, {}
+                for _, value in ipairs(source.values) do choices[value] = true end
+                for _, value in ipairs(field.visibleValues) do
+                    assert(finite(value) and choices[value] and not seen[value],
+                        'provider visibility value must be a distinct source choice')
+                    seen[value] = true
+                end
+            end
+        end
     end
     table.sort(groups, sort)
     for _, group in ipairs(groups) do

@@ -347,6 +347,13 @@ function M.generate(registry, options)
                                     {'provider', identity, field.id})
                                 local metadata = {Id=settingId, Label=field.label, Group=groupId, Type=field.type,
                                     Default=field.default, Description=field.description, ammLevel=field.level}
+                                if field.visibleWhen then
+                                    local sourceId = definition.settings[field.visibleWhen]
+                                    assert(sourceId, 'provider visibility source must precede dependent field: '
+                                        .. field.id)
+                                    metadata.VisibleWhen = sourceId
+                                    metadata.VisibleValues = table.concat(field.visibleValues, '|')
+                                end
                                 if field.type == 'picker' then
                                     metadata.PresetValues = table.concat(field.values, '|')
                                     metadata.PresetLabels = table.concat(field.labels, '|')
