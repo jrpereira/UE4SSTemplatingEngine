@@ -1,5 +1,6 @@
 local Runtime=require('te.player_actions.runtime')
 local Dispatch=require('te.player_actions.dispatch')
+local Delivery=require('te.player_actions.delivery')
 local targets=require('te.player_actions.native_targets')
 local keyCodes=require('te.player_actions.key_codes')
 local M={}
@@ -83,27 +84,7 @@ function M.new(queue,log,category)
    if generation~=api.generation or not api.ready then return end
    local service=api.service
    if type(service)~='table' then return end
-   local ok,result=pcall(function()
-    if definition.shared then
-     if phase~='Triggered' then return true end
-     local group=api.selectedGroup or api.defaultGroup or 1
-     local kind=api.groupTypes and api.groupTypes[group]
-     return kind and service:activateQuickslot(kind,definition.slot)
-    end
-    if definition.slot then
-     if phase~='Triggered' then return true end
-     return service:activateQuickslot(definition.type,definition.slot)
-    end
-    if definition.binding.mode==2 and (phase=='Completed' or phase=='Canceled') then
-     api.selectedGroup=api.defaultGroup
-    elseif phase=='Triggered' or phase=='Started' then
-     if phase=='Triggered' and definition.binding.mode==0 and api.defaultUnbound
-         and api.selectedGroup==definition.groupIndex then
-      api.selectedGroup=api.defaultGroup
-     else api.selectedGroup=definition.groupIndex end
-    else return true end
-    return service:selectQuickslotGroup(api.selectedGroup)
-   end)
+   local ok,result=pcall(Delivery.deliver,api.template,api,definition,phase,service)
    if not ok or result==false then log('Quickslots action dispatch failed: '..tostring(result)) end
   end)
   if not queued then log('Quickslots game-thread dispatch failed: '..tostring(why)) end

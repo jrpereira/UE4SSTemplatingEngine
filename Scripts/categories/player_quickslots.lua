@@ -6,7 +6,7 @@ local category = {
     events = { "GroupSelected", "SlotActivated" },
 
     paths = {
-        "WidgetSwitcher /Game/_Dawnwalker/UI/_Unified/HUD/WBP_GameHUD.WBP_GameHUD_C:WidgetTree.QuickslotsSwitcher",
+        switcher = "WidgetSwitcher /Game/_Dawnwalker/UI/_Unified/HUD/WBP_GameHUD.WBP_GameHUD_C:WidgetTree.QuickslotsSwitcher",
     },
 
     contexts = { "combat", "openworld" },
@@ -22,11 +22,22 @@ local category = {
            { type = "Consumable", slot = "Right" },
            { type = "Consumable", slot = "Bottom" },
        },
+
+    settings = {
+        fields = {
+            { id = "AccessMode", type = "picker", label = "Input Keys", description = "Choose between more keys vs more combinations",
+              values = { 0, 1, 2 }, labels = { "Grouped", "Individual", "Advanced" }, default = 0,
+              tab = true, level = 4, order = 2 },
+
+            { id = "Advanced", type = "text", default = "0|20,40,1.0,1.0|40,-420,0.8,0.7", order = -1 }
+
+       }
+    }
 }
 
 function category:resolveTarget(service)
     if type(service.findObject) ~= 'function' then return nil end
-    return service:findObject(self.paths[1])
+    return service:findObject(self.paths.switcher)
 end
 
 local function restore(service, record)

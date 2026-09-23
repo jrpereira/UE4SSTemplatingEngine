@@ -33,7 +33,12 @@ local ok, failure = xpcall(function()
             return 'built'
         end},
     }
+    local savedBoot = package.loaded['te.menu_boot']
+    package.loaded['te.menu_boot'] = {prepare=function()
+        return {}, {pages=assert(loadfile(pagePath, 't', {}))().pages}
+    end}
     local extension=dofile(root..'/Scripts/dmm_extension.lua')
+    package.loaded['te.menu_boot'] = savedBoot
     check(extension.install(buildApi)==nil)
     check(extension.install(buildApi)==false)
     check(buildApi.pages.build(tree, providers, status, hostApi) == 'built')

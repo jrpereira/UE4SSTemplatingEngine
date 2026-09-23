@@ -148,6 +148,7 @@ function M.generate(registry, options)
     end
     local function storageIdentity(entry) return entry.id end
     local decoded = {}
+    local categorySettings = {}
     for _, category in ipairs(registry.categories:list()) do
         local categoryLabel = (options.categoryLabels or {})[category]
             or title(category:gsub('%.', ' '))
@@ -189,6 +190,109 @@ function M.generate(registry, options)
                 multiSelectors[category] = {}
             end
             decoded[category] = {}
+            local categoryGroups, staticSettings = Provider.normalizeCategory(
+                registry.categories:getCategory(category).settings)
+            local sharedFields = {}
+            categorySettings[category] = {fields=sharedFields, static=staticSettings}
+            local visibleValues = categorySingle and table.concat(values, '|', 2) or nil
+            for _, providerGroup in ipairs(categoryGroups) do
+                local groupId = group(key({category, 'category_provider', providerGroup.id}),
+                    providerGroup.label, selector, values[2], selector, visibleValues,
+                    providerGroup.level, providerGroup.heading == false and 0 or nil,
+                    publicName(category) .. publicName(providerGroup.id))
+                for _, field in ipairs(providerGroup.fields) do
+                    local settingId = namedId(publicName(category) .. publicName(field.id),
+                        {'category_provider', category, field.id})
+                    local metadata = {Id=settingId, Label=field.label, Group=groupId, Type=field.type,
+                        Default=field.default, Description=field.description, ammLevel=field.level}
+                    if field.type == 'picker' then
+                        metadata.PresetValues = table.concat(field.values, '|')
+                        metadata.PresetLabels = table.concat(field.labels, '|')
+                        metadata.ammType = field.tab and 'tab' or nil
+                    else
+                        metadata.Minimum, metadata.Maximum, metadata.Step = field.min, field.max, field.step
+                        metadata.Suffix = field.suffix
+                    end
+                    row(metadata)
+                    rows[#rows]._control = true
+                    aggregateRows[#aggregateRows + 1] = rows[#rows]
+                    sharedFields[field.id] = settingId
+                end
+            end
+            local sharedQuickslots
+            if category == 'player.quickslots' and sharedFields.AccessMode then
+                local actions = registry.categories:getCategory(category).actions
+                local ordered = V.orderedGroups({name=category}, nil, actions)
+                local access = sharedFields.AccessMode
+                sharedQuickslots = {access=access, categoryAccess=true,
+                    direct={}, groups={}, shared={}, advanced={}}
+                local function sharedBinding(identity, label, groupId, publicId, defaultKey, defaultMode, modes)
+                    local pair = binding(identity, label, groupId, nil, nil, modes or slotModes,
+                        publicId, defaultKey, defaultMode)
+                    for index = #rows - 1, #rows do
+                        rows[index]._control = true
+                        aggregateRows[#aggregateRows + 1] = rows[index]
+                    end
+                    return pair
+                end
+                local maxSlots, slotIndex, groupNames = 0, 0, {}
+                for _, item in ipairs(ordered) do
+                    local g = item.value
+                    assert(not groupNames[g.name], 'category action group names must be unique')
+                    groupNames[g.name] = true
+                    maxSlots = math.max(maxSlots, g.slots)
+                    local directGroup = group(key({category, 'direct', g.name}), g.name,
+                        selector, values[2], access, 1, 5, nil,
+                        publicName(category) .. publicName(g.name))
+                    sharedQuickslots.direct[item.key] = {}
+                    for slot = 1, g.slots do
+                        slotIndex = slotIndex + 1
+                        local nativeSlot = ((slotIndex - 1) % 4) + 1
+                        local defaultMode = slotIndex > 4 and slotModes[2] or slotModes[1]
+                        local slotName = g.slotNames and g.slotNames[slot] or tostring(slot)
+                        sharedQuickslots.direct[item.key][slot] = sharedBinding(
+                            key({category, 'direct', g.type, slotName}),
+                            'Slot ' .. slotIndex .. ' (' .. g.type .. ')', directGroup,
+                            publicName(category) .. publicName(g.type) .. publicName(slotName),
+                            quickslotDefaults.slots[nativeSlot], defaultMode)
+                    end
+                end
+                local activateGroup = group(key({category, 'groups'}), 'Groups',
+                    selector, values[2], access, 0, nil, nil,
+                    publicName(category) .. 'Groups')
+                for index, item in ipairs(ordered) do
+                    local g = item.value
+                    local modes = index == 1 and {0, 2, -1} or {0, 2}
+                    sharedQuickslots.groups[item.key] = sharedBinding(
+                        key({category, 'activate', g.type}), g.name, activateGroup,
+                        publicName(category) .. 'Group' .. publicName(g.type),
+                        index == 2 and quickslotDefaults.swap or 0, 0, modes)
+                end
+                local sharedGroup = group(key({category, 'slots'}), 'Slots',
+                    selector, values[2], access, 0, nil, nil,
+                    publicName(category) .. 'Slots')
+                for slot = 1, maxSlots do
+                    sharedQuickslots.shared[slot] = sharedBinding(
+                        key({category, 'shared', slot}), 'Slot ' .. slot, sharedGroup,
+                        publicName(category) .. 'SharedSlot' .. slot,
+                        quickslotDefaults.slots[((slot - 1) % 4) + 1], slotModes[1])
+                end
+                local advancedGroup = group(key({category, 'advanced'}), 'Group Keys Per Slot',
+                    selector, values[2], access, 2, nil, nil,
+                    publicName(category) .. 'Advanced')
+                for _, item in ipairs(ordered) do
+                    local g = item.value
+                    sharedQuickslots.advanced[item.key] = {}
+                    for slot = 1, g.slots do
+                        local slotName = g.slotNames and g.slotNames[slot] or tostring(slot)
+                        sharedQuickslots.advanced[item.key][slot] = sharedBinding(
+                            key({category, 'advanced', g.type, slotName}),
+                            g.name .. ' ' .. slotName .. ' group key', advancedGroup,
+                            publicName(category) .. 'GroupKey' .. publicName(g.type) .. publicName(slotName),
+                            0, slotModes[1])
+                    end
+                end
+            end
             for _, entry in ipairs(available) do
                 local template, identity = entry.template, storageIdentity(entry)
                 currentOwner = identity
@@ -241,7 +345,15 @@ function M.generate(registry, options)
                         end
                     end
                 end
-                if category == 'player.quickslots' then
+                if sharedQuickslots then
+                    definition.access = sharedQuickslots.access
+                    definition.categoryAccess = true
+                    definition.direct = sharedQuickslots.direct
+                    definition.groups = sharedQuickslots.groups
+                    definition.shared = sharedQuickslots.shared
+                    definition.advanced = sharedQuickslots.advanced
+                    emitProviderFields('AccessMethod')
+                elseif category == 'player.quickslots' then
                     local ordered = V.orderedGroups(template, (options.groupOrders or {})[entry.id],
                         registry.categories:getCategory(category).actions)
                     local access = namedId(scopePrefix .. 'AccessMethod', {'access', identity})
@@ -360,17 +472,27 @@ function M.generate(registry, options)
         end
         local result = {}
         local function readBinding(pair) return {key = effective[pair.key], mode = effective[pair.mode]} end
-        local function readSelection(definition)
+        local function readSelection(definition, category)
             local selection = {configuration = {}}
             if not definition then return selection end
             selection.id = definition.id
             local config = selection.configuration
+            local shared = categorySettings[category]
+            if shared then
+                config.categorySettings = U.copy(shared.static)
+                for field, settingId in pairs(shared.fields) do
+                    config.categorySettings[field] = effective[settingId]
+                end
+            end
             if definition.settings then
                 config.settings = {}
                 for field, settingId in pairs(definition.settings) do config.settings[field] = effective[settingId] end
             end
             if definition.access then
-                config.access = effective[definition.access]
+                local selectedAccess = effective[definition.access]
+                config.access = definition.categoryAccess
+                    and (selectedAccess == 0 and 1 or selectedAccess == 1 and 0 or 2)
+                    or selectedAccess
                 config.firstGroupDefault = false
                 config.direct, config.groups, config.shared = {}, {}, {}
                 for groupKey, slots in pairs(definition.direct) do
@@ -379,6 +501,15 @@ function M.generate(registry, options)
                 end
                 for groupKey, pair in pairs(definition.groups) do config.groups[groupKey] = readBinding(pair) end
                 for i, pair in ipairs(definition.shared) do config.shared[i] = readBinding(pair) end
+                if definition.advanced then
+                    config.advanced = {}
+                    for groupKey, slots in pairs(definition.advanced) do
+                        config.advanced[groupKey] = {}
+                        for i, pair in ipairs(slots) do
+                            config.advanced[groupKey][i] = readBinding(pair)
+                        end
+                    end
+                end
             end
             return selection
         end
@@ -386,7 +517,7 @@ function M.generate(registry, options)
           if not includedCategories or includedCategories[category] then
             local definition = decoded[category][effective[selector.id]]
             if not owned or not definition or owned[definition.id] then
-                result[category] = readSelection(definition)
+                result[category] = readSelection(definition, category)
             end
           end
         end
@@ -398,7 +529,7 @@ function M.generate(registry, options)
                 if not owned or owned[item.definition.id] then
                     if owned then selections._known[item.definition.id] = true end
                 if effective[item.id] == 1 then
-                    selections[#selections + 1] = readSelection(item.definition)
+                    selections[#selections + 1] = readSelection(item.definition, category)
                 end
                 end
             end

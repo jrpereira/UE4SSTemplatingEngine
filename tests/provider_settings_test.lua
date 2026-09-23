@@ -51,7 +51,7 @@ local index={}; for i,item in ipairs(items) do index[item.id]=i end
 local selector=menu.selectors['player.quickslots']; local value=next(selector.byValue)
 local def=menu.definitions['player.quickslots'][value]
 local provider=def.settings
-check(index[provider.WheelsDisplayed]==index[def.access]+1)
+check(index[provider.WheelsDisplayed]>index[def.access])
 check(index[provider.WheelsDisplayed]<index[provider.PrimaryWheel])
 check(index[provider.PrimaryOpacity]<index[provider.SecondaryX])
 check(items[index[provider.WheelsDisplayed]].ammTabs and items[index[provider.PrimaryX]].ammGroup.font==4)

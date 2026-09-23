@@ -1,7 +1,9 @@
 local source = debug.getinfo(1, 'S').source:gsub('^@', '')
 local scripts = assert(source:match('^(.*)[/\\][^/\\]+$'), 'cannot locate TE Scripts')
 local root = assert(scripts:match('^(.*)[/\\]Scripts$'), 'cannot locate TE module')
-local definitions = assert(loadfile(root .. '/menu-pages.lua', 't', {}))()
+package.path = scripts .. '/?.lua;' .. package.path
+local _, menu = require('te.menu_boot').prepare(root)
+local definitions = {version=1, pages=menu.pages}
 
 assert(type(definitions) == 'table' and definitions.version == 1
     and type(definitions.pages) == 'table', 'invalid TE menu page definitions')

@@ -1,7 +1,23 @@
 -- Explicit menu-testing host. No input mapping, native discovery or visual hooks.
-local TE = require('te.init')
+local Boot = require('te.menu_boot')
 local ObjectPaths = require('te.object_paths')
 local M = {}
+local legacyQuickslots = {TE_PlayerQuickslotsAccessMode='TE_AccessMethod',
+    TE_PlayerQuickslotsGroupAbility='TE_Group1',
+    TE_PlayerQuickslotsGroupConsumable='TE_Group2'}
+for slot, name in ipairs({'Left','Top','Right','Bottom'}) do
+    legacyQuickslots['TE_PlayerQuickslotsAbility' .. name] = 'TE_Slot' .. slot
+    legacyQuickslots['TE_PlayerQuickslotsConsumable' .. name] = 'TE_Slot' .. (slot + 4)
+    legacyQuickslots['TE_PlayerQuickslotsSharedSlot' .. slot] = 'TE_SharedSlot' .. slot
+end
+local legacyBases = {}
+for settingId, oldId in pairs(legacyQuickslots) do
+    legacyBases[#legacyBases + 1] = {settingId, oldId}
+end
+for _, pair in ipairs(legacyBases) do
+    local settingId, oldId = pair[1], pair[2]
+    legacyQuickslots[settingId .. 'Mode'] = oldId .. 'Mode'
+end
 local function read(path)
     local file = assert(io.open(path, 'rb'), 'missing installed file: ' .. path)
     local content = file:read('*a'); file:close(); return content
@@ -46,7 +62,18 @@ local function ensureConfig(path, rows)
     for _, row in ipairs(rows) do
         local index = present[row.Id]
         if not index then
-            missing[#missing + 1] = row.Id .. '=' .. string.format('%.17g', tonumber(row.Default))
+            local default = tonumber(row.Default)
+            local oldId = legacyQuickslots[row.Id]
+            local oldIndex = oldId and present[oldId]
+            if oldIndex then
+                local raw = lines[oldIndex]:match('=%s*([^;#]+)')
+                local migrated = raw and tonumber(raw:match('^%s*(.-)%s*$'))
+                if row.Id == 'TE_PlayerQuickslotsAccessMode' and (migrated == 0 or migrated == 1) then
+                    migrated = 1 - migrated
+                end
+                if accepted(row, migrated) then default = migrated end
+            end
+            missing[#missing + 1] = row.Id .. '=' .. string.format('%.17g', default)
         else
             local raw = lines[index]:match('=%s*([^;#]+)')
             local value = raw and tonumber(raw:match('^%s*(.-)%s*$'))
@@ -100,35 +127,13 @@ local function readConfigValues(path)
     return values
 end
 function M.start(root, settings, queue, log)
-    local profile = assert(loadfile(root .. '/menu-profile.lua', 't', {}))()
-    assert(profile.mode == 'menu-test', 'unsupported installed profile')
     local service
     local inputHost
-    local categoryFiles = {}
-    for _, path in ipairs(profile.categories or {}) do
-        categoryFiles[#categoryFiles + 1] = root .. '/' .. path
-    end
-    local te = TE.new({categoriesFolder=root..'/Scripts/categories',
-        categoryFiles=categoryFiles, templatesFolder=root..'/Scripts',
-        listFiles=function() return {} end,
-        resolveTarget=function(category, context)
+    local te, menu = Boot.prepare(root, {resolveTarget=function(category, context)
             if type(context)=='table' and type(context.targets)=='table' and context.targets[category]~=nil then
                 return context.targets[category]
             end
         end})
-    for _, path in ipairs(profile.templates) do te:registerTemplate(root .. '/' .. path) end
-    te:loadTemplatesFromRegister()
-    local catalog = assert(loadfile(root .. '/identity-catalog.lua', 't', {}))()
-    local menu = te:generateMenu({catalog=catalog,description=profile.description})
-    assert(menu.aggregate.manifest == read(root .. '/mod_settings.ini'), 'template/schema changed; rebuild TE menu before restart')
-    local pageDefinitions = assert(loadfile(root .. '/menu-pages.lua', 't', {}))()
-    assert(pageDefinitions.version == 1 and #pageDefinitions.pages == #menu.pages,
-        'category page definitions changed; rebuild TE menu before restart')
-    for index, page in ipairs(menu.pages) do
-        local saved = pageDefinitions.pages[index]
-        assert(saved.id == page.id and saved.category == page.category and saved.module == page.module
-            and saved.manifest == page.manifest, 'routed page changed; rebuild TE menu before restart')
-    end
     if ensureConfig(root .. '/config.ini', menu.rows) then log('Added defaults for new template settings.') end
     service = {}
     function service:valid(object)

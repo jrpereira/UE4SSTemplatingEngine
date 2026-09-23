@@ -42,7 +42,7 @@ function service:same(a,b) return rawequal(a,b) end
 function service:identity(value) return value.name end
 function service:parent(value) return value.parent end
 function service:findObject(path)
-    assert(path == category.paths[1])
+    assert(path == category.paths.switcher)
     return switcher
 end
 assert(category:resolveTarget(service) == switcher)

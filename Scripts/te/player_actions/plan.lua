@@ -21,10 +21,10 @@ function M.build(template, configuration, category)
     assert(type(configuration) == 'table', 'quickslots configuration required')
     local ordered = V.orderedGroups(template, nil, category and category.actions)
     local access = configuration.access
-    assert(access == 0 or access == 1, 'unsupported quickslots access method')
+    assert(access == 0 or access == 1 or access == 2, 'unsupported quickslots access method')
     local result = {access = access, actions = {}}
 
-    if access == 0 then
+    if access == 0 or access == 2 then
         assert(type(configuration.direct) == 'table', 'direct quickslots bindings required')
         local primary = type(configuration.settings) == 'table' and configuration.settings.PrimaryWheel == 1
             and 'ability' or 'consumable'
@@ -49,6 +49,25 @@ function M.build(template, configuration, category)
                     contexts = item.value.contexts or (category and category.contexts) or template.contexts,
                     binding = binding(slots[slot], item.key .. ' slot ' .. slot),
                 }
+            end
+        end
+        if access == 2 then
+            assert(type(configuration.advanced) == 'table', 'advanced group bindings required')
+            for groupIndex, item in ipairs(ordered) do
+                local slots = assert(configuration.advanced[item.key],
+                    'missing advanced group bindings for ' .. item.key)
+                for slot = 1, item.value.slots do
+                    local slotName = item.value.slotNames and item.value.slotNames[slot] or tostring(slot)
+                    result.actions[#result.actions + 1] = {
+                        id = 'IA_TE_GroupKey_' .. item.value.type .. '_' .. slotName,
+                        group = item.key,
+                        type = item.value.type,
+                        groupIndex = groupIndex,
+                        targetSlot = slot,
+                        contexts = item.value.contexts or (category and category.contexts) or template.contexts,
+                        binding = binding(slots[slot], item.key .. ' group key ' .. slot),
+                    }
+                end
             end
         end
     else

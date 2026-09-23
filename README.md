@@ -48,7 +48,7 @@ te:registerTemplate("<Module>/Scripts/my_quickslots.lua")
 
 `registerTemplates(folder)` is available when a folder contains only template entry points. It registers every `.lua` file returned by the host's nonrecursive `listFiles` adapter.
 
-Once templates are loaded, TE validates them, adds them to the mod menu, and remembers the active template for each category. It invokes lifecycle methods only while the selected template has `settings.enabled = true`.
+Once templates are loaded, TE validates them, builds the mod menu during boot, and remembers the active template for each category. DMM loads TE's extension before provider discovery, so TE writes the current menu manifest and routed pages in that startup sequence. The identity catalog preserves saved setting IDs across boots. TE invokes lifecycle methods only while the selected template has `settings.enabled = true`.
 
 The `Templates` DMM page always aggregates every loaded template. A template may declare `single = true` or `single = false`; when it omits the field, TE copies the category's `single` value as its fallback. Templates sharing a category must resolve to the same value. A single category has one template picker. Other categories show one Yes/No picker per template and may activate several templates at once.
 
@@ -66,7 +66,7 @@ Each template needs:
 - `category`: the game feature it replaces.
 - `attach`, `render`, and `detach`: the runtime lifecycle.
 
-Category objects live in `Scripts/categories/*.lua`. TE loads every category object at startup; each file declares its own `name`, and `single = true` when the category allows one selected template. Other modules can add categories with `te:loadCategory(name, path)` before loading their templates. `player.quickslots` declares ordered slot actions with `type` and `slot`, plus shared `contexts`. TE groups those actions by type to generate direct-slot and group-first key bindings. Templates reference the category by name; they do not need their own `actions` or `contexts` fields.
+Category objects live in `Scripts/categories/*.lua`. TE loads every category object at startup; each file declares its own `name`, and `single = true` when the category allows one selected template. Other modules can add categories with `te:loadCategory(name, path)` before loading their templates. `player.quickslots` declares ordered slot actions with `type` and `slot`, plus shared `contexts` and `settings`. TE generates category controls once, ahead of template controls, so their IDs and saved key assignments stay stable while switching templates. Numeric category settings are editable in DMM and arrive in `configuration.categorySettings`; text defaults are available there without an editor control. Templates reference the category by name; they do not need their own `actions` or `contexts` fields.
 
 A category may define `resolveTarget`, `attach`, and `detach`. TE calls category `attach(service, target, configuration, previousCategoryHandle, template)` before the selected template's `attach`, then passes the returned category handle as the last argument to the template's `attach`, `render`, and `detach`. On a template switch, TE detaches the old template while keeping the category attached; when the category is cleared, it detaches the template first and the category second. A category author decides what its hooks create, retain, and restore.
 

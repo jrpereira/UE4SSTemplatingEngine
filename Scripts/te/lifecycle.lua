@@ -135,6 +135,8 @@ function M.new(registry, options)
             V.template(entry.template, registry.categories, entry.location, enabled(entry.template))
             assert(type(configuration) == 'table', 'committed configuration must be a table')
             local spec = U.copy(configuration)
+            Provider.validateCategory(registry.categories:getCategory(category).settings,
+                spec.categorySettings)
             Provider.validate(entry.template.settings, spec.settings)
             local previous = self.active[slot]
             if not enabled(entry.template) then

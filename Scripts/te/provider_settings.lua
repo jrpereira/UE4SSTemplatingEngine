@@ -123,4 +123,66 @@ function M.validate(declaration, committed)
     return committed
 end
 
+-- Category settings are shared by every template in that category. DMM can
+-- edit numeric fields; text defaults remain available to the category code.
+function M.normalizeCategory(declaration)
+    if declaration == nil then return {}, {} end
+    assert(type(declaration) == 'table', 'category settings must be a table')
+    allowed(declaration, {groups=true,fields=true}, 'category settings')
+    local declaredGroups = declaration.groups or {}
+    local declaredFields = declaration.fields or {}
+    U.array(declaredGroups, 'category settings.groups')
+    U.array(declaredFields, 'category settings.fields')
+    local groups = #declaredGroups > 0 and U.copy(declaredGroups)
+        or {{id='Shared', label='Shared', level=4}}
+    local defaultGroup = groups[1].id
+    local numeric, static, seen = {}, {}, {}
+    for _, source in ipairs(declaredFields) do
+        assert(type(source) == 'table', 'category field must be a table')
+        identifier(source.id, 'category field id')
+        assert(not seen[source.id], 'duplicate category field ' .. source.id)
+        seen[source.id] = true
+        if source.type == 'text' then
+            allowed(source, {id=true,type=true,default=true,order=true}, 'category text field')
+            assert(type(source.default) == 'string', 'category text default must be a string')
+            static[source.id] = source.default
+        else
+            local field = U.copy(source)
+            field.group = field.group or defaultGroup
+            numeric[#numeric + 1] = field
+        end
+    end
+    if #numeric == 0 then return {}, static end
+    return M.normalize({enabled=true,target='templates',groups=groups,fields=numeric}), static
+end
+
+function M.validateCategory(declaration, committed)
+    local groups, static = M.normalizeCategory(declaration)
+    local expected = {}
+    for _, group in ipairs(groups) do
+        for _, field in ipairs(group.fields) do
+            expected[field.id] = true
+            local value = type(committed) == 'table' and committed[field.id]
+            assert(finite(value), 'missing/invalid category setting ' .. field.id)
+            if field.type == 'integer' then
+                assert(value % 1 == 0 and value >= field.min and value <= field.max,
+                    'category setting outside range ' .. field.id)
+            else
+                local found = false
+                for _, candidate in ipairs(field.values) do if value == candidate then found = true end end
+                assert(found, 'invalid category choice ' .. field.id)
+            end
+        end
+    end
+    for name, default in pairs(static) do
+        expected[name] = true
+        assert(type(committed) == 'table' and committed[name] == default,
+            'invalid category text setting ' .. name)
+    end
+    if next(expected) == nil and committed == nil then return nil end
+    assert(type(committed) == 'table', 'committed category settings are required')
+    for name in pairs(committed) do assert(expected[name], 'unknown category setting ' .. tostring(name)) end
+    return committed
+end
+
 return M
