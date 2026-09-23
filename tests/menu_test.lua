@@ -56,6 +56,9 @@ for _, last in ipairs({2, 5}) do
     local model, indices = modelFor(result, 'player.quickslots')
     local rowsById = {}; for _, item in ipairs(result.rows) do rowsById[item.Id] = item end
     local selector = result.selectors['player.quickslots']
+    check(result.aggregate.rows[1].ammLevel == 2
+        and result.pageByCategory['player.quickslots'].rows[1].ammLevel == 1)
+    check(model.items[indices[selector.id]].ammHeader)
     local selected = next(selector.byValue)
     local definition = result.definitions['player.quickslots'][selected]
     local scopePrefix = 'TE_'
@@ -92,7 +95,7 @@ for _, last in ipairs({2, 5}) do
         check(model.items[indices[definition.direct['2'][slot].key]].default == 48 + slot)
         check(model.items[indices[definition.direct['2'][slot].mode]].default == 1)
     end
-    check(model.items[indices[selector.id]].ammFont == 2)
+    check(model.items[indices[selector.id]].ammFont == 1)
     check(model.items[indices[definition.access]].ammFont == 2)
     check(model.items[indices[selector.id]].ammGroup.heading == false)
     check(model.items[indices[definition.access]].ammGroup.heading == false)
@@ -138,6 +141,30 @@ for _, last in ipairs({2, 5}) do
     values[definition.shared[1].key] = 255
     rejects(function() result.decode(values) end, 'invalid key')
 end
+local navigationFixture=fixture(2,'Navigation')
+navigationFixture.settings.groups={{id='Views',label='Views',heading=false}}
+navigationFixture.settings.fields={
+    {id='View',type='navigation',group='Views',label='View',values={0,1},
+        labels={'More','Primary'},default=0,tab=true,tabNavigation=1,level=2},
+    {id='Offset',type='integer',group='Views',label='Offset',min=-10,max=10,
+        step=1,default=0,visibleWhen='View',visibleValues={1}},
+}
+local navigationMenu=Menu.generate(registryFor(navigationFixture))
+local navigationPage=assert(navigationMenu.pageByCategory['player.quickslots'])
+local navigationValue=next(navigationMenu.selectors['player.quickslots'].byValue)
+local navigationDef=navigationMenu.definitions['player.quickslots'][navigationValue]
+check(navigationDef.navigation.View and navigationDef.settings.View==nil)
+local navigationRow
+local navigationValues={}
+for _,item in ipairs(navigationPage.rows) do
+    if item.Id==navigationDef.navigation.View then navigationRow=item
+    else navigationValues[item.Id]=tonumber(item.Default) end
+end
+check(navigationRow and navigationRow.ammNavigation==1 and navigationRow.tabNavigation==1
+    and navigationRow.ConfigFile==nil and navigationRow.ConfigKey==nil)
+check(navigationPage.manifest:find('tabNavigation=1',1,true))
+navigationValues[navigationMenu.selectors['player.quickslots'].id]=navigationValue
+check(navigationPage.decode(navigationValues)['player.quickslots'].settings.View==nil)
 local baseRegistry = registryFor(fixture(2))
 local initial = Menu.generate(baseRegistry)
 local more = Menu.generate(registryFor({fixture(2, 'AAA'), fixture(2)}), {catalog = initial.catalog})

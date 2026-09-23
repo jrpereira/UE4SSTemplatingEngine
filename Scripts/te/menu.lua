@@ -90,11 +90,13 @@ function M.generate(registry, options)
         for _, name in ipairs(names) do lines[#lines + 1] = name .. '=' .. tostring(fields[name]) end
         lines[#lines + 1] = ''
     end
-    emit('Mod', {Id = 'UE4SSTemplatingEngine', Name = 'Templates', Version = '0.0.18',
+    emit('Mod', {Id = 'UE4SSTemplatingEngine', Name = 'Templates', Version = '0.0.19',
         Description = options.description and text(options.description) or nil})
     local function row(fields)
         assert(#rows < 256, 'generated menu exceeds DMM limit of 256 settings')
-        fields.ConfigFile, fields.ConfigSection, fields.ConfigKey = 'config.ini', 'Templates', fields.Id
+        if not fields.ammNavigation then
+            fields.ConfigFile, fields.ConfigSection, fields.ConfigKey = 'config.ini', 'Templates', fields.Id
+        end
         rows[#rows + 1] = fields
         fields._category = currentCategory
         fields._owner = currentOwner
@@ -220,7 +222,8 @@ function M.generate(registry, options)
                     local settingId = namedId(publicName(category) .. publicName(field.id),
                         {'category_provider', category, field.id})
                     local metadata = {Id=settingId, Label=field.label, Group=groupId, Type=field.type,
-                        Default=field.default, Description=field.description, ammLevel=field.level}
+                        Default=field.default, Description=field.description, ammLevel=field.level,
+                        tabNavigation=field.tabNavigation}
                     if field.type == 'picker' then
                         metadata.PresetValues = table.concat(field.values, '|')
                         metadata.PresetLabels = table.concat(field.labels, '|')
@@ -318,7 +321,7 @@ function M.generate(registry, options)
                 local scopePrefix = templateScope and templateScope .. '_' or ''
                 local definition = {id=entry.id,scope=templateScope,fields={},enabled=template.settings.enabled}
                 local providerGroups = Provider.normalize(template.settings)
-                definition.settings = {}
+                definition.settings, definition.navigation = {}, {}
                 decoded[category][value] = definition
                 local ownerSelector, ownerValue = selector, value
                 if not categorySingle then
@@ -345,16 +348,21 @@ function M.generate(registry, options)
                                     scopePrefix .. publicName(providerGroup.id))
                                 local settingId = namedId(scopePrefix .. publicName(field.id),
                                     {'provider', identity, field.id})
-                                local metadata = {Id=settingId, Label=field.label, Group=groupId, Type=field.type,
-                                    Default=field.default, Description=field.description, ammLevel=field.level}
+                                local navigation=field.type=='navigation'
+                                local metadata = {Id=settingId, Label=field.label, Group=groupId,
+                                    Type=navigation and 'picker' or field.type,
+                                    Default=field.default, Description=field.description, ammLevel=field.level,
+                                    ammNavigation=navigation and 1 or nil,
+                                    tabNavigation=field.tabNavigation}
                                 if field.visibleWhen then
                                     local sourceId = definition.settings[field.visibleWhen]
+                                        or definition.navigation[field.visibleWhen]
                                     assert(sourceId, 'provider visibility source must precede dependent field: '
                                         .. field.id)
                                     metadata.VisibleWhen = sourceId
                                     metadata.VisibleValues = table.concat(field.visibleValues, '|')
                                 end
-                                if field.type == 'picker' then
+                                if field.type == 'picker' or navigation then
                                     metadata.PresetValues = table.concat(field.values, '|')
                                     metadata.PresetLabels = table.concat(field.labels, '|')
                                     metadata.ammType = field.tab and 'tab' or nil
@@ -363,7 +371,8 @@ function M.generate(registry, options)
                                     metadata.Suffix = field.suffix
                                 end
                                 row(metadata)
-                                definition.settings[field.id] = settingId
+                                if navigation then definition.navigation[field.id]=settingId
+                                else definition.settings[field.id]=settingId end
                             end
                         end
                     end
@@ -443,12 +452,14 @@ function M.generate(registry, options)
     end
     local function providerManifest(providerId, providerName, selectedRows, aggregatePage)
         local output = {}
-        local headerPickers = 0
+        local headerPickers, navigationPickers = 0, 0
         for _, item in ipairs(selectedRows) do
             if item.ammLevel == 1 then headerPickers = headerPickers + 1 end
+            if item.ammNavigation then navigationPickers=navigationPickers+1 end
         end
         assert(headerPickers <= 1, providerName .. ': only one level-1 picker per page')
-        append(output, 'Mod', {Id=providerId, Name=providerName, Version='0.0.18',
+        assert(navigationPickers <= 1, providerName .. ': only one navigation picker per page')
+        append(output, 'Mod', {Id=providerId, Name=providerName, Version='0.0.19',
             Description=options.description and text(options.description) or nil})
         local usedGroups, visibleGroups, hiddenByGroup = {}, {}, {}
         for _, item in ipairs(selectedRows) do
@@ -485,18 +496,20 @@ function M.generate(registry, options)
         local effective = {}
         for settingId, r in pairs(schema) do effective[settingId] = tonumber(r.Default) end
         for _, r in ipairs(requiredRows) do
-            local settingId = r.Id
-            local value = values[settingId]
-            assert(type(value) == 'number' and value == value, 'missing/invalid setting ' .. settingId)
-            if r.Type == 'integer' then
-                assert(value >= r.Minimum and value <= r.Maximum and value % 1 == 0,
-                    (r.ammType == 'keybind' and 'invalid key ' or 'invalid integer ') .. settingId)
-            else
-                local found = false
-                for candidate in r.PresetValues:gmatch('[^|]+') do if value == tonumber(candidate) then found = true end end
-                assert(found, 'invalid choice ' .. settingId)
+            if not r.ammNavigation then
+                local settingId = r.Id
+                local value = values[settingId]
+                assert(type(value) == 'number' and value == value, 'missing/invalid setting ' .. settingId)
+                if r.Type == 'integer' then
+                    assert(value >= r.Minimum and value <= r.Maximum and value % 1 == 0,
+                        (r.ammType == 'keybind' and 'invalid key ' or 'invalid integer ') .. settingId)
+                else
+                    local found = false
+                    for candidate in r.PresetValues:gmatch('[^|]+') do if value == tonumber(candidate) then found = true end end
+                    assert(found, 'invalid choice ' .. settingId)
+                end
+                effective[settingId] = value
             end
-            effective[settingId] = value
         end
         local result = {}
         local function readBinding(pair) return {key = effective[pair.key], mode = effective[pair.mode]} end
@@ -590,11 +603,20 @@ function M.generate(registry, options)
     end
     local function routedRows(categories, owned)
         local selected = {}
+        local category = next(categories)
+        local headerSelector = category and next(categories, category) == nil
+            and selectors[category] and selectors[category].id
         for _, item in ipairs(rows) do
             if categories[item._category] then
                 if item._control or (item._owner and owned[item._owner]) then
-                    selected[#selected + 1] = item
-                elseif item._owner then
+                    if item.Id == headerSelector then
+                        local header = U.copy(item)
+                        header.ammLevel = 1
+                        selected[#selected + 1] = header
+                    else
+                        selected[#selected + 1] = item
+                    end
+                elseif item._owner and not item.ammNavigation then
                     local hidden, control = U.copy(item), assert(ownerControls[item._owner])
                     hidden._routeHidden, hidden._hideWhen, hidden._hideValue = true, control.id, control.impossible
                     selected[#selected + 1] = hidden

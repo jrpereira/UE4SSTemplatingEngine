@@ -12,8 +12,10 @@ input.AppliedInputContexts = {[object('InputMappingContext /Game/IMC_OW.Instance
 local controller = object('BP_PlayerController_C /Game/BP_PlayerController_C.Instance')
 controller.PlayerInput, controller.AcknowledgedPawn = input, pawn
 local subsystem = object('EnhancedInputLocalPlayerSubsystem /Game/Subsystem')
+local directControllerLookup=true
 FindAllOf = function(class)
-    if class == 'BP_PlayerController_C' then return {controller} end
+    if class == 'BP_PlayerController_C' then return directControllerLookup and {controller} or {} end
+    if class == 'PlayerController' then return {controller} end
     if class == 'EnhancedInputLocalPlayerSubsystem' then return {subsystem} end
     return {}
 end
@@ -21,7 +23,8 @@ StaticFindObject = function() return nil end
 StaticConstructObject = function() return nil end
 FName = function(value) return value end
 RegisterHook = function() end
-NotifyOnNewObject = function() end
+local notifications={}
+NotifyOnNewObject = function(path, fn) notifications[path]=fn end
 UE4SSLuaEventBridge = {GetCapabilities=function() return {api=4,enhanced_input=true,
     explicit_target=true,detailed_errors=true,target_ue4ss_commit='97b7e501'} end,
     OpenInputComponent=function() end, BindAction=function() end, CloseInputComponent=function() end}
@@ -67,4 +70,14 @@ assert(table.concat(calls, ',') == 'ability:1,group:2,consumable:1,group:1,abili
 assert(host:deactivate() and closed == 1)
 activeCallback(plan.actions[3], 'Triggered')
 assert(#calls == 5, 'stale bridge callbacks must not dispatch after deactivation')
+directControllerLookup=false
+pawn.InputComponent=nil
+local later = require('te.player_actions.ue4ss_host').new(function(fn) fn() end,
+    function(message) error(message) end, category)
+local ready,why=later:apply({category='player.quickslots'}, {PrimaryWheel=1}, service)
+assert(not ready and why=='gameplay Enhanced Input stack unavailable')
+pawn.InputComponent=component
+notifications['/Script/EnhancedInput.EnhancedInputComponent'](component)
+assert(commits==2, 'pawn input component creation must retry pending context activation')
+assert(later:deactivate())
 print('PASS input host delivery: bound before gate, shared group routing, stale callback guard')

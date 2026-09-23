@@ -30,7 +30,7 @@ for _,page in ipairs(menu.pages) do
     local category=page.category and string.format('%q',page.category) or 'nil'
     local module=page.module and string.format('%q',page.module) or 'nil'
     pageLines[#pageLines+1]=string.format('{id=%q,name=%q,category=%s,module=%s,version=%q,manifest=%q},',
-        page.id,page.name,category,module,'0.0.18',page.manifest)
+        page.id,page.name,category,module,'0.0.19',page.manifest)
 end
 pageLines[#pageLines+1]='}}\n';write('menu-pages.lua',table.concat(pageLines,'\n'))
 local lines={'return {version=1,next='..menu.catalog.next..',entries={'}

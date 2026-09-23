@@ -40,7 +40,7 @@ local function pagesSource(pages)
         local category = page.category and string.format('%q', page.category) or 'nil'
         local module = page.module and string.format('%q', page.module) or 'nil'
         lines[#lines + 1] = string.format('{id=%q,name=%q,category=%s,module=%s,version=%q,manifest=%q},',
-            page.id, page.name, category, module, '0.0.18', page.manifest)
+            page.id, page.name, category, module, '0.0.19', page.manifest)
     end
     lines[#lines + 1] = '}}\n'
     return table.concat(lines, '\n')

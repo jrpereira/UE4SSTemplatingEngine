@@ -51,9 +51,11 @@ function M.new(queue,log,category)
  end
  local contextNames={combat={native='IMC_RTCombat.',kind='RTCombat'},openworld={native='IMC_OW.',kind='OW'}}
  local function gameplayInput()
-  -- Dawnwalker indexes its live controller under the generated Blueprint class,
-  -- not the PlayerController base class.
-  local pc=find('BP_PlayerController_C')
+  -- Resolve the Dawnwalker Blueprint controller directly when possible; some
+  -- UE4SS builds expose it only through the PlayerController base-class scan.
+  local pc=find('BP_PlayerController_C') or find('PlayerController',function(candidate)
+   return (full(candidate)or''):find('BP_PlayerController_C',1,true)~=nil
+  end)
   playerInput=pc and prop(pc,'PlayerInput')or nil
   local pawn=pc and (prop(pc,'AcknowledgedPawn') or prop(pc,'Pawn')) or nil
   local component=pawn and prop(pawn,'InputComponent') or nil
@@ -217,6 +219,14 @@ function M.new(queue,log,category)
  hook('/Script/Engine.Controller:OnRep_Pawn',wake)
  notify('/Script/Engine.PlayerController')
  notify('/Script/EnhancedInput.EnhancedInputLocalPlayerSubsystem')
+ -- The pawn's input component can be constructed after the controller and
+ -- subsystem notifications. Recheck on the next game-thread turn, when its
+ -- owner has had a chance to assign it to the pawn.
+ notify('/Script/EnhancedInput.EnhancedInputComponent')
+ if type(RegisterLoadMapPostHook)=='function' then
+  local ok,why=pcall(RegisterLoadMapPostHook,function()wake()end)
+  if not ok then log('Enhanced Input map-load hook unavailable: '..tostring(why))end
+ end
  return api
 end
 return M

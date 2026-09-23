@@ -54,10 +54,10 @@ function M.normalize(declaration)
     for index, source in ipairs(declaredFields) do
         assert(type(source) == 'table', 'provider field must be a table')
         allowed(source, {id=true,label=true,group=true,type=true,order=true,default=true,values=true,
-            labels=true,min=true,max=true,step=true,suffix=true,tab=true,level=true,description=true,
+            labels=true,min=true,max=true,step=true,suffix=true,tab=true,tabNavigation=true,level=true,description=true,
             after=true,visibleWhen=true,visibleValues=true}, 'provider field')
         identifier(source.id, 'provider field id'); text(source.label, 'provider field label')
-        level(source.level, source.type == 'picker')
+        level(source.level, source.type == 'picker' or source.type == 'navigation')
         if source.level == 1 then
             headerPickers = headerPickers + 1
             assert(headerPickers <= 1, 'only one level-1 picker per template')
@@ -75,6 +75,8 @@ function M.normalize(declaration)
         assert(field.after == nil or field.after == 'AccessMethod',
             'provider field after must be AccessMethod')
         assert(field.tab == nil or type(field.tab) == 'boolean', 'provider tab must be boolean')
+        assert(field.tabNavigation == nil or (field.tabNavigation == 0 or field.tabNavigation == 1),
+            'provider tabNavigation must be 0 or 1')
         if field.type == 'integer' then
             assert(field.values == nil and field.labels == nil and not field.tab, 'integer cannot declare choices/tabs')
             field.step = field.step or 1
@@ -84,7 +86,7 @@ function M.normalize(declaration)
             assert(field.min < field.max and field.step >= 1 and field.step <= field.max-field.min,
                 'invalid provider integer range/step')
             assert(field.default >= field.min and field.default <= field.max, 'provider default outside range')
-        elseif field.type == 'picker' then
+        elseif field.type == 'picker' or field.type == 'navigation' then
             assert(field.min == nil and field.max == nil and field.step == nil and field.suffix == nil,
                 'picker cannot declare integer range/suffix')
             local count = U.array(field.values, 'provider picker values')
@@ -105,7 +107,7 @@ function M.normalize(declaration)
             if field.visibleWhen then
                 assert(field.visibleWhen ~= field.id, 'provider field cannot hide itself')
                 local source = fields[field.visibleWhen]
-                assert(source and source.type == 'picker',
+                assert(source and (source.type == 'picker' or source.type == 'navigation'),
                     'provider visibility source must be a picker in the same template')
                 local count = U.array(field.visibleValues, 'provider visibility values')
                 assert(count > 0, 'provider visibility values must not be empty')
@@ -131,16 +133,18 @@ function M.validate(declaration, committed)
     local expected = {}
     for _, group in ipairs(M.normalize(declaration)) do
         for _, field in ipairs(group.fields) do
-            expected[field.id] = true
-            local value = committed[field.id]
-            assert(finite(value), 'missing/invalid provider setting ' .. field.id)
-            if field.type == 'integer' then
-                assert(value % 1 == 0 and value >= field.min and value <= field.max,
-                    'provider setting outside range ' .. field.id)
-            else
-                local found = false
-                for _, candidate in ipairs(field.values) do if value == candidate then found = true end end
-                assert(found, 'invalid provider choice ' .. field.id)
+            if field.type ~= 'navigation' then
+                expected[field.id] = true
+                local value = committed[field.id]
+                assert(finite(value), 'missing/invalid provider setting ' .. field.id)
+                if field.type == 'integer' then
+                    assert(value % 1 == 0 and value >= field.min and value <= field.max,
+                        'provider setting outside range ' .. field.id)
+                else
+                    local found = false
+                    for _, candidate in ipairs(field.values) do if value == candidate then found = true end end
+                    assert(found, 'invalid provider choice ' .. field.id)
+                end
             end
         end
     end
