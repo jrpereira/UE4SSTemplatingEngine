@@ -51,6 +51,7 @@ for _, selected in ipairs(choices) do
     local groupKeys = 0
     for _, action in ipairs(plan.actions) do
         if action.targetSlot then groupKeys = groupKeys + 1 end
+        if action.slot then assert(action.groupIndex == 1 or action.groupIndex == 2) end
     end
     assert(groupKeys == 8)
 end

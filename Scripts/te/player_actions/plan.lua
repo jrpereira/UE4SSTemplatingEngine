@@ -35,6 +35,8 @@ function M.build(template, configuration, category)
             if item.value.type == primary then first = item else second = item end
         end
         assert(first and second, 'direct quickslots require ability and consumable action groups')
+        local groupIndices = {}
+        for index, item in ipairs(ordered) do groupIndices[item.key] = index end
         local number = 0
         for _, item in ipairs({first, second}) do
             local slots = assert(configuration.direct[item.key], 'missing direct bindings for ' .. item.key)
@@ -44,7 +46,7 @@ function M.build(template, configuration, category)
                     id = 'IA_ActionSlot' .. number,
                     group = item.key,
                     type = item.value.type,
-                    groupIndex = #result.actions,
+                    groupIndex = access == 2 and groupIndices[item.key] or #result.actions,
                     slot = slot,
                     contexts = item.value.contexts or (category and category.contexts) or template.contexts,
                     binding = binding(slots[slot], item.key .. ' slot ' .. slot),

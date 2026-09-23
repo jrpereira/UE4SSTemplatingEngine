@@ -9,6 +9,8 @@ function M.deliver(template, state, definition, phase, service)
     end
     if definition.slot then
         if phase ~= 'Triggered' then return true end
+        if state.configuration and state.configuration.access == 2
+            and state.selectedGroup ~= definition.groupIndex then return true end
         return service:activateQuickslot(definition.type, definition.slot)
     end
     if definition.binding.mode == 2 and (phase == 'Completed' or phase == 'Canceled') then
