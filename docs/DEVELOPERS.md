@@ -65,7 +65,7 @@ A provider field with `type = 'navigation'` declares picker choices used only to
 
 ModCoreControls owns quickslot access methods, action assignment, Tap/Hold bindings, and native input. ModCoreTemplates owns template selection and visual settings. ModCoreControls runs its input host independently of visual template selection; ModCoreTemplates no longer reads ModCoreControls's saved controls or handles ModCoreControls Apply events.
 
-The Action Fangdango Wheels template owns its Swap and Distant styles, settings, wheel separation, and restoration. ModCoreTemplates discovers the declared target and invokes the template lifecycle. ModCoreControls owns input independently.
+The Fangdango Wheels template owns its Swap and Distant styles, settings, wheel separation, and restoration. ModCoreTemplates discovers the declared target and invokes the template lifecycle. ModCoreControls owns input independently.
 
 ## Template format
 
@@ -79,7 +79,7 @@ Category objects live in `Scripts/categories/*.lua`. ModCoreTemplates loads ever
 
 A category may define `resolveTarget`, `attach`, and `detach`. ModCoreTemplates calls category `attach(service, target, settings, previousCategoryHandle, template)` before the selected template's `attach`, then passes the returned category handle as the last argument to the template's `attach`, `render`, and `detach`. On a template switch, ModCoreTemplates detaches the old template while keeping the category attached; when the category is cleared, it detaches the template first and the category second. A category author decides what its hooks create, retain, and restore.
 
-The quickslots category declares a stable UE object path for QuickslotsSwitcher. Generic lifecycle target discovery resolves a category with one declared path through the service's findObject method. The Action Fangdango template owns wheel-specific attachment, detachment, settings and restoration; there is no category wheel handle or detachSecondaryWheel contract.
+The quickslots category declares a stable UE object path for QuickslotsSwitcher. Generic lifecycle target discovery resolves a category with one declared path through the service's findObject method. The Fangdango template owns wheel-specific attachment, detachment, settings and restoration; there is no category wheel handle or detachSecondaryWheel contract.
 
 ## Category events
 

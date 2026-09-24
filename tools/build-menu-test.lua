@@ -2,16 +2,16 @@ package.path = 'Scripts/?.lua;' .. package.path
 local KET = require('ket.init')
 local CategoryFiles = require('ket.category_files')
 local quickslotsPath, destination, existing = assert(arg[1]), assert(arg[2]), arg[3]
-local description = 'Menu test: Action Fangdango quickslot layouts and input activate after Apply.'
+local description = 'Menu test: Fangdango quickslot layouts and input activate after Apply.'
 local ket=KET.new({listFiles=function() return {} end})
 ket:registerTemplate('Scripts/default.lua');ket:registerTemplate(quickslotsPath)
 ket:loadTemplatesFromRegister()
-assert(#ket.registry.templates == 2, 'expected KET Default and Action Fangdango Wheels++ templates')
+assert(#ket.registry.templates == 2, 'expected KET Default and Fangdango Wheels++ templates')
 local consumers = {}
 for _,entry in ipairs(ket.registry.templates) do
     if entry.template.category=='player.quickslots' then consumers[entry.template.name]=true end
 end
-assert(consumers['Wheels++'], 'expected Action Fangdango Wheels++ template')
+assert(consumers['Wheels++'], 'expected Fangdango Wheels++ template')
 local catalog
 if existing then catalog=assert(loadfile(existing,'t',{}))() end
 local menu=ket:generateMenu({catalog=catalog,description=description})
@@ -34,6 +34,6 @@ lines[#lines+1]='}}\n';write('identity-catalog.lua',table.concat(lines,'\n'))
 local categoryPaths = CategoryFiles.list('Scripts/categories')
 local categories = {}
 for _, path in ipairs(categoryPaths) do categories[#categories + 1] = string.format('%q', path) end
-write('menu-profile.lua','return {mode="menu-test",categories={'..table.concat(categories,',')..'},templates={"Scripts/default.lua","../ActionFangdango/Scripts/templates/main.lua"},description='..string.format('%q',description)..'}\n')
+write('menu-profile.lua','return {mode="menu-test",categories={'..table.concat(categories,',')..'},templates={"Scripts/default.lua","../Fangdango/Scripts/templates/main.lua"},description='..string.format('%q',description)..'}\n')
 write('enabled.txt','')
 print('Built '..#menu.rows..' settings across Templates and '..#menu.pages..' routed pages')
