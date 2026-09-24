@@ -1,8 +1,8 @@
 package.path = 'Scripts/?.lua;' .. package.path
-local Categories = require('te.categories')
-local Registry = require('te.registry')
-local V = require('te.validation')
-local U = require('te.util')
+local Categories = require('ket.categories')
+local Registry = require('ket.registry')
+local V = require('ket.validation')
+local U = require('ket.util')
 local checks = 0
 local function check(value) assert(value); checks = checks + 1 end
 local function rejects(fn, fragment)
@@ -11,7 +11,7 @@ local function rejects(fn, fragment)
     checks = checks + 1
 end
 local categories = Categories.new()
-for _, path in ipairs(require('te.category_files').list('Scripts/categories')) do
+for _, path in ipairs(require('ket.category_files').list('Scripts/categories')) do
     categories:addCategory(assert(loadfile(path))())
 end
 check(table.concat(categories:list(), ',') == 'menu.controls,menu.fixes,menu.templates,npc.attacks,npc.intent,npc.level,npc.melee,npc.pawn,other.unknown,player.charges,player.compass,player.notifications,player.quickslots,player.self,player.stats,player.wheel')
@@ -65,7 +65,7 @@ check(V.template({name='Fixes',category='menu.fixes',settings={target='templates
 local indicator='/Game/_Dawnwalker/UI/_Unified/Combat/WBP_CombatTargetIndicator.WBP_CombatTargetIndicator_C'
 check(V.template({name='Attacks',category='npc.attacks',settings={target='templates',enabled=false},subscribe={{path=indicator,
     events={'created'},contexts={'combat'}}}},categories,'attacks.lua').category=='npc.attacks')
-local Events=require('te.event_contracts')
+local Events=require('ket.event_contracts')
 check(Events.active({contexts={'combat'}},{contexts={combat=true}}))
 check(not Events.active({contexts={'combat'}},{contexts={'openworld'}}))
 rejects(function() V.template({name='Attacks',category='npc.attacks',settings={target='templates',enabled=false},subscribe={{path='Bad',

@@ -1,5 +1,5 @@
 package.path = 'Scripts/?.lua;Scripts/?/init.lua;' .. package.path
-local Runtime = require('te.player_actions.runtime')
+local Runtime = require('ket.player_actions.runtime')
 local objects = {}
 local function object(name)
     local value = {name=name, valid=true, Mappings={}, Triggers={}}

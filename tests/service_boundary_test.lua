@@ -1,5 +1,5 @@
 package.path = 'Scripts/?.lua;' .. package.path
-local C,R,L = require('te.categories'),require('te.registry'),require('te.lifecycle')
+local C,R,L = require('ket.categories'),require('ket.registry'),require('ket.lifecycle')
 local makeService = dofile('tests/support/service.lua')
 local checks, calls = 0, {}
 local function check(value) assert(value); checks=checks+1 end

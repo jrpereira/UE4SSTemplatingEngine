@@ -1,7 +1,7 @@
 package.path = 'Scripts/?.lua;' .. package.path
-local Categories = require('te.categories')
-local Registry = require('te.registry')
-local Menu = require('te.menu')
+local Categories = require('ket.categories')
+local Registry = require('ket.registry')
+local Menu = require('ket.menu')
 local checks = 0
 local function check(value) assert(value); checks = checks + 1 end
 local function rejects(fn, fragment)
@@ -9,8 +9,8 @@ local function rejects(fn, fragment)
     assert(not ok and tostring(err):find(fragment, 1, true), tostring(err))
     checks = checks + 1
 end
-local dmmPath = assert(os.getenv('TE_DMM_CHOICES'), 'TE_DMM_CHOICES required for actual parser integration tests')
-local ammPath = assert(os.getenv('TE_AMM_PRESENTATION'), 'TE_AMM_PRESENTATION required for actual decorator tests')
+local dmmPath = assert(os.getenv('KET_DMM_CHOICES'), 'KET_DMM_CHOICES required for actual parser integration tests')
+local ammPath = assert(os.getenv('KET_AMM_PRESENTATION'), 'KET_AMM_PRESENTATION required for actual decorator tests')
 local Choices, Presentation = dofile(dmmPath), dofile(ammPath)
 local function fixture(last, name)
     return {name = name or 'Quickslots++', category = 'player.quickslots',
@@ -33,7 +33,7 @@ local function modelFor(result, category)
     local provider = category and assert(result.pageByCategory[category]) or result.aggregate
     local parsed = Choices.parse(provider.manifest)
     Presentation.parse(provider.manifest, parsed)
-    local model = Choices.open({id = 'TE-test', choices = parsed, testOnly = true})
+    local model = Choices.open({id = 'KET-test', choices = parsed, testOnly = true})
     assert(not model.error, model.error)
     local indices = {}; for i, item in ipairs(parsed) do indices[item.id] = i end
     return model, indices
@@ -47,7 +47,8 @@ for _, last in ipairs({2, 5}) do
         and #result.pageByCategory['player.quickslots'].rows == #result.rows
         and result.pageByCategory['player.stats'] == nil)
     check(result.aggregate.rows[1].Label == 'Quickslots' and result.aggregate.rows[1].Group == 'Player'
-        and result.aggregate.rows[1].ammTabsWidth == 440)
+        and result.aggregate.rows[1].ammType == nil
+        and result.aggregate.rows[1].ammTabsWidth == nil)
     local quickslotsManifest = result.pageByCategory['player.quickslots'].manifest
     check(not result.manifest:find('Deco', 1, true) and not quickslotsManifest:find('Deco', 1, true))
     for _, key in ipairs({'ammType','ammLevel','ammHeading','ammLabelWhen','ammLabels'}) do
@@ -56,21 +57,22 @@ for _, last in ipairs({2, 5}) do
     local model, indices = modelFor(result, 'player.quickslots')
     local rowsById = {}; for _, item in ipairs(result.rows) do rowsById[item.Id] = item end
     local selector = result.selectors['player.quickslots']
-    check(result.aggregate.rows[1].ammLevel == 2
+    check(result.aggregate.rows[1].ammLevel == 1
         and result.pageByCategory['player.quickslots'].rows[1].ammLevel == 1)
-    check(model.items[indices[selector.id]].ammHeader)
+    check(model.items[indices[selector.id]].ammHeader
+        and not model.items[indices[selector.id]].ammTabs)
     local selected = next(selector.byValue)
     local definition = result.definitions['player.quickslots'][selected]
-    local scopePrefix = 'TE_'
+    local scopePrefix = 'KET_'
     check(definition.scope == nil)
-    check(selector.id == 'TE_Template' and definition.access == scopePrefix .. 'AccessMethod'
-        and definition.firstDefault == nil and rowsById.TE_FirstGroupDefault == nil)
+    check(selector.id == 'KET_Template' and definition.access == scopePrefix .. 'AccessMethod'
+        and definition.firstDefault == nil and rowsById.KET_FirstGroupDefault == nil)
     check(definition.groups['1'].key == scopePrefix .. 'Group1'
         and definition.groups['2'].key == scopePrefix .. 'Group2')
-    check(rowsById.TE_Group1Mode.PresetValues == '0|2|-1'
-        and rowsById.TE_Group1Mode.PresetLabels == 'Tap|Hold|Default')
-    check(rowsById.TE_Group2Mode.PresetValues == '0|2'
-        and rowsById.TE_Group2Mode.PresetLabels == 'Tap|Hold')
+    check(rowsById.KET_Group1Mode.PresetValues == '0|2|-1'
+        and rowsById.KET_Group1Mode.PresetLabels == 'Tap|Hold|Default')
+    check(rowsById.KET_Group2Mode.PresetValues == '0|2'
+        and rowsById.KET_Group2Mode.PresetLabels == 'Tap|Hold')
     for slot = 1, 4 do
         check(definition.direct['1'][slot].key == scopePrefix .. 'Slot' .. slot
             and definition.direct['1'][slot].mode == scopePrefix .. 'Slot' .. slot .. 'Mode')
@@ -179,16 +181,16 @@ local multi = Menu.generate(multiRegistry)
 check(multi.selectors['other.unknown'] == nil and #multi.multiSelectors['other.unknown'] == 3)
 local multiById = {}
 for _, item in ipairs(multi.multiSelectors['other.unknown']) do multiById[item.id] = item end
-check(multiById.TE_CategorySeparator_FirstAttack ~= nil
-    and multiById.TE_CategorySeparator_SecondAttack ~= nil
-    and multiById.TE_CategorySeparator_ThirdAttack ~= nil)
+check(multiById.KET_CategorySeparator_FirstAttack ~= nil
+    and multiById.KET_CategorySeparator_SecondAttack ~= nil
+    and multiById.KET_CategorySeparator_ThirdAttack ~= nil)
 local multiModel, multiIndices = modelFor(multi, 'other.unknown')
-check(multiModel.items[multiIndices['TE_CategorySeparator_FirstAttack']].label == 'First Attack')
+check(multiModel.items[multiIndices['KET_CategorySeparator_FirstAttack']].label == 'First Attack')
 local multiValues = {}; for i, item in ipairs(multiModel.items) do multiValues[item.id] = multiModel.pending[i] end
 check(#multi.decode(multiValues)['other.unknown'] == 0)
-multiValues.TE_CategorySeparator_FirstAttack = 1
+multiValues.KET_CategorySeparator_FirstAttack = 1
 local activeMulti = multi.decode(multiValues)['other.unknown']
-check(#activeMulti == 1 and activeMulti[1].id == multiById.TE_CategorySeparator_FirstAttack.definition.id)
+check(#activeMulti == 1 and activeMulti[1].id == multiById.KET_CategorySeparator_FirstAttack.definition.id)
 local empty = Menu.generate(registryFor({}))
 check(#empty.rows == 0 and #empty.pages == 0 and #empty.warnings == 2
     and next(empty.pageByCategory) == nil and next(empty.selectors) == nil)
@@ -208,11 +210,14 @@ groupedRegistry:registerTemplate('grouped.lua'); groupedRegistry:loadTemplatesFr
 local grouped = Menu.generate(groupedRegistry)
 check(#grouped.aggregate.rows == 3 and #grouped.pages == 3)
 check(grouped.aggregate.rows[1]._category == 'menu.fixes'
-    and grouped.aggregate.rows[1].Id == 'TE_CategorySeparator_MenuFix'
+    and grouped.aggregate.rows[1].Id == 'KET_CategorySeparator_MenuFix'
     and grouped.aggregate.rows[1].Label == 'Menu Fix' and grouped.aggregate.rows[1].Group == 'Menu'
     and grouped.aggregate.rows[1].ammTabsWidth == 440)
 check(grouped.aggregate.rows[2]._category == 'player.quickslots'
-    and grouped.aggregate.rows[2].Label == 'Quickslots' and grouped.aggregate.rows[2].Group == 'Player')
+    and grouped.aggregate.rows[2].Label == 'Quickslots' and grouped.aggregate.rows[2].Group == 'Player'
+    and grouped.aggregate.rows[2].ammLevel == 1
+    and grouped.aggregate.rows[2].ammType == nil
+    and grouped.aggregate.rows[2].ammTabsWidth == nil)
 check(grouped.aggregate.rows[3]._category == 'player.stats'
     and grouped.aggregate.rows[3].Label == 'Stats' and grouped.aggregate.rows[3].Group == 'Player'
     and grouped.aggregate.rows[3].ammTabsWidth == 440)

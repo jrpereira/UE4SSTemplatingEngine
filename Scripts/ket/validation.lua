@@ -1,6 +1,6 @@
-local U = require('te.util')
-local Provider = require('te.provider_settings')
-local Events = require('te.event_contracts')
+local U = require('ket.util')
+local Provider = require('ket.provider_settings')
+local Events = require('ket.event_contracts')
 local M = {}
 
 function M.actions(actions, where)

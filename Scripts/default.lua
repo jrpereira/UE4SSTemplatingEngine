@@ -1,7 +1,7 @@
 local template = {
     name = "Default",
     category = "menu.templates",
-    settings = { target = "templates", enabled = true },
+    settings = { target = "templates", enabled = false },
 
     menu = {
         aggregate = {

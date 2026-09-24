@@ -1,5 +1,5 @@
 package.path = 'Scripts/?.lua;Scripts/?/init.lua;' .. package.path
-local targets = require('te.player_actions.native_targets')
+local targets = require('ket.player_actions.native_targets')
 assert(#targets == 6, 'exactly six verified native quickslot actions are gated')
 local seen = {}
 for _, name in ipairs(targets) do

@@ -1,7 +1,7 @@
 package.path = 'Scripts/?.lua;' .. package.path
-local Categories = require('te.categories')
-local Registry = require('te.registry')
-local Lifecycle = require('te.lifecycle')
+local Categories = require('ket.categories')
+local Registry = require('ket.registry')
+local Lifecycle = require('ket.lifecycle')
 local checks = 0
 local function check(value) assert(value); checks = checks + 1 end
 local categories = Categories.new(); categories:registerCategory('player', {'quickslots'})
@@ -136,4 +136,34 @@ selected=multiRuntime:selection('menu.fixes')
 check(#selected==1 and selected[1].id==secondId)
 check(multiRuntime:commit({revision=4,values={}},function()return {['menu.fixes']={}}end,{}))
 check(multiRuntime:selection('menu.fixes')==nil)
+
+local layeredCategories=Categories.new();layeredCategories:registerCategory('other',{'unknown'})
+local layerCalls={}
+local function layer(name)
+    return {category='other.unknown',name=name,settings={target='templates',enabled=true},
+        attach=function(self)
+            layerCalls[#layerCalls+1]='attach:'..self.name
+            return {}
+        end,
+        render=function(self)
+            layerCalls[#layerCalls+1]='render:'..self.name
+            return 'applied'
+        end,
+        detach=function(self)
+            layerCalls[#layerCalls+1]='detach:'..self.name
+            return true
+        end}
+end
+local layeredRegistry=Registry.new(layeredCategories,{execute=function()return {layer('Alpha'),layer('Bravo')}end})
+layeredRegistry:registerTemplate('layers.lua');layeredRegistry:loadTemplatesFromRegister()
+local alpha,bravo=layeredRegistry.templates[1].id,layeredRegistry.templates[2].id
+local layeredRuntime=Lifecycle.new(layeredRegistry,{resolveService=function()return {}end})
+check(layeredRuntime:commit({revision=1,values={}},function()
+    return {['other.unknown']={{id=bravo,settings={}},{id=alpha,settings={}}}}
+end,{}))
+check(table.concat(layerCalls,',')=='attach:Alpha,attach:Bravo')
+check(layeredRuntime:render('other.unknown',{},nil,'test')=='applied')
+check(table.concat(layerCalls,',')=='attach:Alpha,attach:Bravo,render:Alpha,render:Bravo')
+check(layeredRuntime:detach('other.unknown',{},'disable'))
+check(table.concat(layerCalls,',')=='attach:Alpha,attach:Bravo,render:Alpha,render:Bravo,detach:Bravo,detach:Alpha')
 print('lifecycle: ' .. checks .. ' checks passed')

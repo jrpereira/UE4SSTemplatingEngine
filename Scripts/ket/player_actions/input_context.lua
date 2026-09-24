@@ -1,4 +1,4 @@
-local Plan = require('te.player_actions.plan')
+local Plan = require('ket.player_actions.plan')
 
 return function(e)
     local contexts, actions = {}, {}

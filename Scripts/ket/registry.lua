@@ -1,5 +1,5 @@
-local U = require('te.util')
-local V = require('te.validation')
+local U = require('ket.util')
+local V = require('ket.validation')
 local M = {}
 
 function M.new(categories, options)

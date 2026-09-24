@@ -1,4 +1,4 @@
-"""Run TE's offline Lua suites with an explicitly available Lua 5.4 runtime."""
+"""Run KET's offline Lua suites with an explicitly available Lua 5.4 runtime."""
 import argparse
 import os
 from pathlib import Path
@@ -18,8 +18,8 @@ for directory in ('work', 'outputs'):
     (ROOT / directory).mkdir(exist_ok=True)
 files = sorted(ROOT.glob('Scripts/**/*.lua'))
 for path in files:
-    env = dict(os.environ, TE_SYNTAX_FILE=str(path))
-    subprocess.run([args.lua, '-e', 'assert(loadfile(os.getenv("TE_SYNTAX_FILE")))'], cwd=ROOT, env=env, check=True)
+    env = dict(os.environ, KET_SYNTAX_FILE=str(path))
+    subprocess.run([args.lua, '-e', 'assert(loadfile(os.getenv("KET_SYNTAX_FILE")))'], cwd=ROOT, env=env, check=True)
 tests = sorted(ROOT.glob('tests/*_test.lua'))
 for path in tests:
     subprocess.run([args.lua, str(path)], cwd=ROOT, check=True)

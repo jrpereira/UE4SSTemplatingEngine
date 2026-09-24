@@ -1,24 +1,8 @@
--- Explicit menu-testing host. No input mapping, native discovery or visual hooks.
-local Boot = require('te.menu_boot')
-local ObjectPaths = require('te.object_paths')
-local Provider = require('te.provider_settings')
+-- Installed host for menu settings, quickslot controls, and visual templates.
+local Boot = require('ket.menu_boot')
+local ObjectPaths = require('ket.object_paths')
+local Provider = require('ket.provider_settings')
 local M = {}
-local legacyQuickslots = {TE_PlayerQuickslotsAccessMode='TE_AccessMethod',
-    TE_PlayerQuickslotsGroupAbility='TE_Group1',
-    TE_PlayerQuickslotsGroupConsumable='TE_Group2'}
-for slot, name in ipairs({'Left','Top','Right','Bottom'}) do
-    legacyQuickslots['TE_PlayerQuickslotsAbility' .. name] = 'TE_Slot' .. slot
-    legacyQuickslots['TE_PlayerQuickslotsConsumable' .. name] = 'TE_Slot' .. (slot + 4)
-    legacyQuickslots['TE_PlayerQuickslotsSharedSlot' .. slot] = 'TE_SharedSlot' .. slot
-end
-local legacyBases = {}
-for settingId, oldId in pairs(legacyQuickslots) do
-    legacyBases[#legacyBases + 1] = {settingId, oldId}
-end
-for _, pair in ipairs(legacyBases) do
-    local settingId, oldId = pair[1], pair[2]
-    legacyQuickslots[settingId .. 'Mode'] = oldId .. 'Mode'
-end
 local function read(path)
     local file = assert(io.open(path, 'rb'), 'missing installed file: ' .. path)
     local content = file:read('*a'); file:close(); return content
@@ -61,26 +45,18 @@ local function ensureConfig(path, rows, textSettings)
         return false
     end
     for _, row in ipairs(rows) do
-        local index = present[row.Id]
-        if not index then
-            local default = tonumber(row.Default)
-            local oldId = legacyQuickslots[row.Id]
-            local oldIndex = oldId and present[oldId]
-            if oldIndex then
-                local raw = lines[oldIndex]:match('=%s*([^;#]+)')
-                local migrated = raw and tonumber(raw:match('^%s*(.-)%s*$'))
-                if row.Id == 'TE_PlayerQuickslotsAccessMode' and (migrated == 0 or migrated == 1) then
-                    migrated = 1 - migrated
+        if row.ammNavigation ~= 1 then
+            local index = present[row.Id]
+            if not index then
+                local default = tonumber(row.Default)
+                missing[#missing + 1] = row.Id .. '=' .. string.format('%.17g', default)
+            else
+                local raw = lines[index]:match('=%s*([^;#]+)')
+                local value = raw and tonumber(raw:match('^%s*(.-)%s*$'))
+                if not accepted(row, value) then
+                    lines[index] = row.Id .. '=' .. string.format('%.17g', tonumber(row.Default))
+                    changed = true
                 end
-                if accepted(row, migrated) then default = migrated end
-            end
-            missing[#missing + 1] = row.Id .. '=' .. string.format('%.17g', default)
-        else
-            local raw = lines[index]:match('=%s*([^;#]+)')
-            local value = raw and tonumber(raw:match('^%s*(.-)%s*$'))
-            if not accepted(row, value) then
-                lines[index] = row.Id .. '=' .. string.format('%.17g', tonumber(row.Default))
-                changed = true
             end
         end
     end
@@ -103,12 +79,12 @@ local function ensureConfig(path, rows, textSettings)
         for index = #missing, 1, -1 do table.insert(lines, finish, missing[index]) end
     end
     local output = table.concat(lines, '\n') .. '\n'
-    local temporary = path .. '.te.tmp'
+    local temporary = path .. '.ket.tmp'
     local stale = io.open(temporary, 'rb'); if stale then stale:close() end
     assert(not stale, 'stale temporary config file: ' .. temporary)
     local out = assert(io.open(temporary, 'wb')); assert(out:write(output)); assert(out:close())
     if existed then
-        local backup = path .. '.te.bak'
+        local backup = path .. '.ket.bak'
         stale = io.open(backup, 'rb'); if stale then stale:close() end
         assert(not stale, 'stale backup config file: ' .. backup)
         assert(os.rename(path, backup)); local ok, why = os.rename(temporary, path)
@@ -119,16 +95,19 @@ local function ensureConfig(path, rows, textSettings)
     end
     return true
 end
-local function readConfigValues(path, textSettings)
+local function readConfigValues(path, textSettings, rows)
     local file = assert(io.open(path, 'rb'), 'missing installed config: ' .. path)
     local content = file:read('*a'); file:close()
     local values, section = {}, nil
+    local known = {}
+    for _, row in ipairs(rows) do known[row.Id] = true end
+    for key in pairs(textSettings or {}) do known[key] = true end
     for line in (content:gsub('\r\n', '\n'):gsub('\r', '\n') .. '\n'):gmatch('(.-)\n') do
         local heading = line:match('^%s*%[([^%]]+)%]%s*$')
         if heading then section = heading
         elseif section == 'Templates' then
             local key, value = line:match('^%s*([^=;#]+)%s*=%s*([^;#]*)')
-            if key then
+            if key and known[key] then
                 key, value = key:match('^%s*(.-)%s*$'), value:match('^%s*(.-)%s*$')
                 if textSettings and textSettings[key] then
                     values[key] = Provider.validateText(textSettings[key].format, value)
@@ -144,8 +123,7 @@ local function readConfigValues(path, textSettings)
 end
 function M.start(root, settings, queue, log)
     local service
-    local inputHost
-    local te, menu = Boot.prepare(root, {resolveTarget=function(category, context)
+    local ket, menu = Boot.prepare(root, {resolveTarget=function(category, context)
             if type(context)=='table' and type(context.targets)=='table' and context.targets[category]~=nil then
                 return context.targets[category]
             end
@@ -175,82 +153,105 @@ function M.start(root, settings, queue, log)
         if type(FindAllOf) ~= 'function' then return nil end
         return ObjectPaths.findLive(path, FindAllOf, function(object) return self:valid(object) end)
     end
-    function service:activateQuickslot(kind, slot)
-        local field = kind == 'ability' and 'WBP_AA_Quickslots' or kind == 'consumable' and 'WBP_HUD_Quickslots' or nil
-        local names = {'Left', 'Top', 'Right', 'Bottom'}
-        if not field or not names[slot] or type(FindAllOf) ~= 'function' then return false end
-        local ok, huds = pcall(FindAllOf, 'WBP_GameHUD_C')
-        if not ok or type(huds) ~= 'table' then return false end
-        for _, hud in ipairs(huds) do
-            local named = self:valid(hud) and self:identity(hud) or ''
-            if named:find('/Engine/Transient', 1, true) then
-                local wheel = hud[field]
-                local button = wheel and wheel[names[slot]]
-                local unwrapped, value = pcall(function() return button:get() end)
-                if unwrapped then button = value end
-                if self:valid(button) then
-                    local clicked = pcall(function() button:BP_OnClicked() end)
-                    return clicked
-                end
-            end
-        end
-        return false
-    end
-    function service:selectQuickslotGroup(index)
-        if index ~= 1 and index ~= 2 or type(FindAllOf) ~= 'function' then return false end
-        local ok, huds = pcall(FindAllOf, 'WBP_GameHUD_C')
-        if not ok or type(huds) ~= 'table' then return false end
-        for _, hud in ipairs(huds) do
-            if self:valid(hud) and self:identity(hud):find('/Engine/Transient', 1, true) then
-                local switcher = hud.QuickslotsSwitcher
-                local unwrapped, value = pcall(function() return switcher:get() end)
-                if unwrapped then switcher = value end
-                if self:valid(switcher) then
-                    local selected = pcall(function() switcher:SetActiveWidgetIndex(index - 1) end)
-                    return selected
-                end
-            end
-        end
-        return false
-    end
-    inputHost = require('te.player_actions.ue4ss_host').new(queue, log,
-        te.categories:getCategory('player.quickslots'))
-    local initial = menu.decode(readConfigValues(root .. '/config.ini', menu.textSettings))['player.quickslots']
+    local visualHost = require('ket.quickslot_visual_host').new(ket.runtime, service)
+    local initial = menu.decode(readConfigValues(root .. '/config.ini', menu.textSettings, menu.rows))['player.quickslots']
     if initial and initial.id then
-        local template = assert(te.registry.byId[initial.id], 'persisted Quickslots template is unavailable').template
-        local bound, why = inputHost:apply(template, initial.settings, service)
-        if bound then log('Persisted Quickslots template input is active.')
-        else log('Persisted Quickslots template input pending: ' .. tostring(why)) end
+        assert(ket.registry.byId[initial.id], 'persisted Quickslots template is unavailable')
+        local shown, visualWhy = visualHost:select(initial)
+        if not shown then log('Persisted Quickslots visuals failed: ' .. tostring(visualWhy))
+        elseif visualWhy == 'not_ready' then log('Persisted Quickslots visuals are waiting for the HUD.') end
     else
-        inputHost:deactivate()
+        visualHost:adopt(nil)
     end
     local routed = {subscribe=function(provider, callback)
         return settings.subscribe(provider, function(event) queue(function()
             local values = {}
             for key, value in pairs(event.values) do values[key] = value end
-            local current = readConfigValues(root .. '/config.ini', menu.textSettings)
+            local current = readConfigValues(root .. '/config.ini', menu.textSettings, menu.rows)
             for settingId in pairs(menu.textSettings) do values[settingId] = current[settingId] end
             callback({providerId=event.providerId, revision=event.revision,
                 values=values, changes=event.changes})
         end) end)
     end}
-    te:subscribeApplied(routed, menu, function()
+    local scheduleVisualRetry
+    ket:subscribeApplied(routed, menu, function()
         return {playerActions=service, services={['menu.templates']={}}}
     end, function(ok, errors)
         if ok then
-            local id, settings = te.runtime:selection('player.quickslots')
-            if not id then inputHost:deactivate(); log('Quickslots template cleared; restored native input actions.')
+            local id, settings = ket.runtime:selection('player.quickslots')
+            if not id then
+                visualHost:adopt(nil)
+                log('Quickslots visual template cleared.')
             else
-                local template = te.registry.byId[id].template
-                local bound, why = inputHost:apply(template, settings, service)
-                if bound then log('Committed template settings received; replacement quickslots bindings are active.')
-                else log('Quickslots bindings pending: ' .. tostring(why)) end
+                visualHost:adopt(id, settings)
+                log('Committed quickslot visual template settings received.')
+                if scheduleVisualRetry then scheduleVisualRetry() end
             end
         elseif type(errors)=='table' then
             for category, message in pairs(errors) do log(category .. ': ' .. tostring(message)) end
         else log('Apply failed: ' .. tostring(errors)) end
     end)
-    log('Menu-testing runtime ready. Settings persist through AMM; change a setting and Apply to exercise callbacks.')
-    return te, menu
+    local visualRetryScheduled, visualApplied = false, false
+    local function wakeVisual(invalidate)
+        if invalidate then visualApplied = false end
+        local ok, ready, why = pcall(function()
+            if invalidate then return visualHost:worldInvalidated() end
+            return visualHost:wake()
+        end)
+        if not ok then log('Quickslots visual wake failed: ' .. tostring(ready))
+        elseif not ready then log('Quickslots visuals failed: ' .. tostring(why))
+        elseif why == 'not_ready' or ket.runtime.pending['player.quickslots'] then
+            scheduleVisualRetry()
+        elseif visualHost.desired and not visualApplied then
+            visualApplied = true
+            log('Quickslots visuals applied to the HUD.')
+        end
+    end
+    scheduleVisualRetry = function()
+        if visualRetryScheduled or not visualHost.desired
+            or not ket.runtime.pending['player.quickslots']
+            or type(ExecuteWithDelay) ~= 'function' then return end
+        visualRetryScheduled = true
+        local scheduled, why = pcall(ExecuteWithDelay, 500, function()
+            local queued, queueWhy = pcall(queue, function()
+                visualRetryScheduled = false
+                wakeVisual(false)
+            end)
+            if not queued then
+                visualRetryScheduled = false
+                log('Quickslots visual retry queue failed: ' .. tostring(queueWhy))
+            end
+        end)
+        if not scheduled then
+            visualRetryScheduled = false
+            log('Quickslots visual retry timer failed: ' .. tostring(why))
+        end
+    end
+    scheduleVisualRetry()
+    local function enqueueVisual(invalidate)
+        local ok, why = pcall(queue, function() wakeVisual(invalidate) end)
+        if not ok then log('Quickslots visual scheduling failed: ' .. tostring(why)) end
+    end
+    if type(NotifyOnNewObject) == 'function' then
+        local ok, why = pcall(NotifyOnNewObject,
+            '/Game/_Dawnwalker/UI/_Unified/HUD/WBP_GameHUD.WBP_GameHUD_C',
+            function() enqueueVisual(true) end)
+        if not ok then log('Game HUD notification unavailable: ' .. tostring(why)) end
+    end
+    if type(RegisterHook) == 'function' then
+        local ok, why = pcall(RegisterHook, '/Script/UMG.UserWidget:Construct',
+            function() end, function()
+                if visualHost.desired and ket.runtime.pending['player.quickslots'] then
+                    enqueueVisual(false)
+                end
+            end)
+        if not ok then log('Widget construction retry unavailable: ' .. tostring(why)) end
+    end
+    if type(RegisterLoadMapPostHook) == 'function' then
+        local ok, why = pcall(RegisterLoadMapPostHook, function() enqueueVisual(true) end)
+        if not ok then log('Map-load visual retry unavailable: ' .. tostring(why)) end
+    end
+    log('KET runtime ready. Apply commits template visuals; KEC runs quickslot controls.')
+    return ket, menu
 end
 return M

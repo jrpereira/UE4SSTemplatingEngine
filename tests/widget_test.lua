@@ -1,5 +1,5 @@
 package.path = 'Scripts/?.lua;' .. package.path
-local W = require('te.widget')
+local W = require('ket.widget')
 local checks = 0
 local function check(value) assert(value); checks = checks + 1 end
 local function wrapped(value) return {get=function() return value end} end

@@ -1,4 +1,4 @@
-local U = require('te.util')
+local U = require('ket.util')
 local M = {}
 
 -- A category stores the stable blueprint object path. Its live instance has

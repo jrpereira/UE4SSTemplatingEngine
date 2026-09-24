@@ -1,13 +1,24 @@
-local U = require('te.util')
-local V = require('te.validation')
-local Provider = require('te.provider_settings')
-local Events = require('te.event_contracts')
+local U = require('ket.util')
+local V = require('ket.validation')
+local Provider = require('ket.provider_settings')
+local Events = require('ket.event_contracts')
 local M = {}
 
 function M.new(registry, options)
     options = options or {}
     local self = {active = {}, pending = {}, multi = {}, categoryHandles = {}, revision = 0}
     local busy = false
+    local function sortedKeys(values, descending)
+        local keys = {}
+        for key in pairs(values) do keys[#keys + 1] = key end
+        table.sort(keys)
+        if descending then
+            local reversed = {}
+            for i = #keys, 1, -1 do reversed[#reversed + 1] = keys[i] end
+            return reversed
+        end
+        return keys
+    end
     local function enabled(template) return template.settings.enabled == true end
     local function resolveService(category, context)
         local service
@@ -114,9 +125,8 @@ function M.new(registry, options)
         return guarded(function()
             local states = self.multi[category]
             if states then
-                local keys = {}; for _, stateKey in pairs(states) do keys[#keys + 1] = stateKey end
-                table.sort(keys)
-                for _, stateKey in ipairs(keys) do
+                for _, identity in ipairs(sortedKeys(states, true)) do
+                    local stateKey = states[identity]
                     local ok, err = detach(category, context, reason or 'disable', stateKey)
                     if not ok then return nil, err end
                 end
@@ -269,7 +279,8 @@ function M.new(registry, options)
         return guarded(function()
             local states = self.multi[category]
             if states then
-                for _, stateKey in pairs(states) do
+                for _, identity in ipairs(sortedKeys(states)) do
+                    local stateKey = states[identity]
                     local pending = self.pending[stateKey]
                     if pending then
                         local ok, why = apply(category, pending.id, pending.settings, context, nil, stateKey)
@@ -297,7 +308,8 @@ function M.new(registry, options)
             local states = self.multi[category]
             if states then
                 local overall, detail = 'ignored', nil
-                for _, stateKey in pairs(states) do
+                for _, identity in ipairs(sortedKeys(states)) do
+                    local stateKey = states[identity]
                     local status, err = renderRecord(category, self.active[stateKey], context, target, reason)
                     if status == 'applied' then overall = 'applied'
                     elseif status == 'not_ready' and overall ~= 'applied' then overall = 'not_ready' end
@@ -329,7 +341,8 @@ function M.new(registry, options)
             local states = self.multi[category]
             if states then
                 local overall, detail = 'ignored', nil
-                for _, stateKey in pairs(states) do
+                for _, identity in ipairs(sortedKeys(states)) do
+                    local stateKey = states[identity]
                     local status, err = dispatchRecord(category, event, context, payload, stateKey)
                     if status == nil then return nil, err end
                     if status == 'applied' then overall = 'applied'
@@ -416,13 +429,15 @@ function M.new(registry, options)
                     assert(not desired[item.id], 'duplicate multi-template selection')
                     desired[item.id] = item
                 end
-                for identity, stateKey in pairs(states) do
+                for _, identity in ipairs(sortedKeys(states, true)) do
+                    local stateKey = states[identity]
                     if (not partial or known[identity]) and not desired[identity] then
                         local ok, err = guarded(function() return detach(category, context, 'none', stateKey) end)
                         if not ok then errors[category .. ':' .. identity] = err else states[identity] = nil end
                     end
                 end
-                for identity, item in pairs(desired) do
+                for _, identity in ipairs(sortedKeys(desired)) do
+                    local item = desired[identity]
                     if not errors[category .. ':' .. identity] then
                         local stateKey = states[identity] or (category .. '\0' .. identity)
                         local ok, err = guarded(function()

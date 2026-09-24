@@ -1,4 +1,4 @@
-local Widget = require('te.widget')
+local Widget = require('ket.widget')
 
 local category = {
     name = "player.quickslots",
@@ -39,7 +39,10 @@ local category = {
 
 function category:resolveTarget(service)
     if type(service.findObject) ~= 'function' then return nil end
-    return service:findObject(self.paths.switcher)
+    local switcher = service:findObject(self.paths.switcher)
+    if not service:valid(switcher) or type(switcher.GetChildrenCount) ~= 'function'
+        or switcher:GetChildrenCount() < 2 then return nil end
+    return switcher
 end
 
 local function restore(service, record)

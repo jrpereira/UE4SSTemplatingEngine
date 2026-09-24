@@ -16,7 +16,7 @@ NotifyOnNewObject = function(path, callback)
 end
 RegisterLoadMapPostHook = function(callback) mapPost=callback end
 
-local host = require('te.player_actions.ue4ss_host').new(function(callback) callback() end, function() end)
+local host = require('ket.player_actions.ue4ss_host').new(function(callback) callback() end, function() end)
 assert(type(host.sync) == 'function', 'expected Enhanced Input host')
 for _, path in ipairs({
     '/Script/EnhancedInput.EnhancedInputSubsystemInterface:AddMappingContext',

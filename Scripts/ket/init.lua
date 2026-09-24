@@ -1,9 +1,9 @@
-local Categories = require('te.categories')
-local Registry = require('te.registry')
-local Lifecycle = require('te.lifecycle')
-local Menu = require('te.menu')
-local Events = require('te.event_contracts')
-local CategoryFiles = require('te.category_files')
+local Categories = require('ket.categories')
+local Registry = require('ket.registry')
+local Lifecycle = require('ket.lifecycle')
+local Menu = require('ket.menu')
+local Events = require('ket.event_contracts')
+local CategoryFiles = require('ket.category_files')
 local M = {}
 
 -- Host supplies discovery, native scheduling/readiness and configuration storage.
@@ -55,7 +55,7 @@ function M.new(options)
         assert(not self.unsubscribe, 'Apply subscription already active')
         assert(type(getContext) == 'function' and type(onResult) == 'function', 'context and result handlers required')
         local unsubscribers, revisions, sequence = {}, {}, 0
-        local providers = menu.providers or {UE4SSTemplatingEngine={id='UE4SSTemplatingEngine',decode=menu.decode}}
+        local providers = menu.providers or {ModCoreTemplates={id='ModCoreTemplates',decode=menu.decode}}
         local ids = {}; for id in pairs(providers) do ids[#ids + 1] = id end; table.sort(ids)
         for _, providerId in ipairs(ids) do
             local provider = providers[providerId]

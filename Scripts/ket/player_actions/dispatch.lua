@@ -1,4 +1,4 @@
--- Binds generated actions through LEB after their IMC mappings exist. The
+-- Binds generated actions through KEngineBridge after their IMC mappings exist. The
 -- binding owner is deliberately separate from InputContext so travel/reload
 -- cleanup never leaves native subscriptions behind.
 return function(e)

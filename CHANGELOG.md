@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Rename the module to KEngineTemplates (KET), with UE4SS mod folder `_KEngineTemplates` and DMM provider ID `KEngineTemplates`. Use the `ket.*` API and `KET_` saved setting IDs.
+- Require KEngineBridge API 5 for native Enhanced Input delivery.
+- Preserve `tabNavigation=1` on navigation tabs and expose their generated IDs through `definition.navigation` without a config binding.
+
 ## 0.0.19 - 2026-09-23
 
 - Load category objects directly at boot and generate category and template menus with shared quickslot controls.

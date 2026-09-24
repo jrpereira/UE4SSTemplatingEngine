@@ -2,8 +2,8 @@
 -- QSF actions. The caller passes ready=true only after it has bound callbacks
 -- for every generated action; this prevents a partial cutover from stranding
 -- player input.
-local InputContext = require('te.player_actions.input_context')
-local Gates = require('te.player_actions.action_gates')
+local InputContext = require('ket.player_actions.input_context')
+local Gates = require('ket.player_actions.action_gates')
 
 return function(e)
     e.input.category = e.category
@@ -14,7 +14,7 @@ return function(e)
         if e.valid(action) then native[#native + 1] = action end
     end
     local gates = Gates({
-        marker = 'TE_NativeActionGate', valid = e.valid, path = e.path, unwrap = e.unwrap,
+        marker = 'KET_NativeActionGate', valid = e.valid, path = e.path, unwrap = e.unwrap,
         same = e.same, each = e.each, actions = function() return native end,
         retainInactive = e.retainInactive, construct = e.constructGate,
         chord = e.chord, setChord = e.setChord, setTriggers = e.setTriggers, rebuild = e.rebuild,

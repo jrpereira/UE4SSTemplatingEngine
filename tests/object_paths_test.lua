@@ -1,5 +1,5 @@
 package.path = 'Scripts/?.lua;' .. package.path
-local Paths = require('te.object_paths')
+local Paths = require('ket.object_paths')
 
 local declared = 'WidgetSwitcher /Game/_Dawnwalker/UI/_Unified/HUD/WBP_GameHUD.WBP_GameHUD_C:WidgetTree.QuickslotsSwitcher'
 local objects = {

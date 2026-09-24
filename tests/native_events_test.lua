@@ -1,5 +1,5 @@
 package.path='Scripts/?.lua;'..package.path
-local Native=require('te.native_events')
+local Native=require('ket.native_events')
 local checks=0
 local function check(value) assert(value);checks=checks+1 end
 local registered,queued,delivered

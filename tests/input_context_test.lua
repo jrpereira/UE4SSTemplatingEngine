@@ -1,5 +1,5 @@
 package.path = 'Scripts/?.lua;Scripts/?/init.lua;' .. package.path
-local InputContext = require('te.player_actions.input_context')
+local InputContext = require('ket.player_actions.input_context')
 local function check(value, message) assert(value, message) end
 local objects = {}
 local function object(name)

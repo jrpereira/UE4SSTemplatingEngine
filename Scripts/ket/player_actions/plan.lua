@@ -1,7 +1,7 @@
 -- Converts a selected quickslots template and its persisted menu values into
 -- stable Enhanced Input action identities. This is deliberately independent
 -- of UE4SS so it can be validated without a running game.
-local V = require('te.validation')
+local V = require('ket.validation')
 local M = {}
 
 local function binding(value, where)
@@ -61,7 +61,7 @@ function M.build(template, settings, category)
                 for slot = 1, item.value.slots do
                     local slotName = item.value.slotNames and item.value.slotNames[slot] or tostring(slot)
                     result.actions[#result.actions + 1] = {
-                        id = 'IA_TE_GroupKey_' .. item.value.type .. '_' .. slotName,
+                        id = 'IA_KET_GroupKey_' .. item.value.type .. '_' .. slotName,
                         group = item.key,
                         type = item.value.type,
                         groupIndex = groupIndex,

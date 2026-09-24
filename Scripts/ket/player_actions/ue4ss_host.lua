@@ -1,8 +1,8 @@
-local Runtime=require('te.player_actions.runtime')
-local Dispatch=require('te.player_actions.dispatch')
-local Delivery=require('te.player_actions.delivery')
-local targets=require('te.player_actions.native_targets')
-local keyCodes=require('te.player_actions.key_codes')
+local Runtime=require('ket.player_actions.runtime')
+local Dispatch=require('ket.player_actions.dispatch')
+local Delivery=require('ket.player_actions.delivery')
+local targets=require('ket.player_actions.native_targets')
+local keyCodes=require('ket.player_actions.key_codes')
 local M={}
 local function unwrap(v) if v==nil then return end local ok,x=pcall(function()return v:get()end);return ok and x or v end
 local function valid(v)local ok,x=pcall(function()return v~=nil and v:IsValid()end);return ok and x==true end
@@ -15,21 +15,22 @@ function M.new(queue,log,category)
  if type(FindAllOf)~='function'or type(StaticFindObject)~='function'or type(StaticConstructObject)~='function'or FName==nil then return{deactivate=function()return true end,apply=function()return false,'Enhanced Input runtime unavailable'end}end
  local playerInput=nil
  local function bridgeApi()
-  local bridge=rawget(_G,'UE4SSLuaEventBridge')
+  local bridge=rawget(_G,'KEngineBridge')
   if type(bridge)~='table' or type(bridge.GetCapabilities)~='function' then
-   return nil,'UE4SSLuaEventBridge unavailable'
+   return nil,'KEngineBridge unavailable'
   end
   local ok,caps=pcall(bridge.GetCapabilities)
   if not ok or type(caps)~='table' or caps.enhanced_input~=true or caps.explicit_target~=true
-      or caps.detailed_errors~=true or tonumber(caps.api or 0)<4 then
-   return nil,'UE4SSLuaEventBridge lacks the required Enhanced Input API'
+      or caps.detailed_errors~=true or tonumber(caps.api or 0)<5
+      or tonumber(bridge.API_VERSION or 0)<5 then
+   return nil,'KEngineBridge lacks the required Enhanced Input API 5'
   end
   if tostring(caps.target_ue4ss_commit or '')~='97b7e501' then
-   return nil,'UE4SSLuaEventBridge targets an incompatible UE4SS build'
+   return nil,'KEngineBridge targets an incompatible UE4SS build'
   end
   if type(bridge.OpenInputComponent)~='function' or type(bridge.BindAction)~='function'
       or type(bridge.CloseInputComponent)~='function' then
-   return nil,'UE4SSLuaEventBridge action binding API unavailable'
+   return nil,'KEngineBridge action binding API unavailable'
   end
   return bridge
  end
@@ -40,7 +41,7 @@ function M.new(queue,log,category)
  end
  local input={valid=valid,retain=retain,initializeIdentity=function(a)assert(StaticFindObject('/Script/Engine.Default__KismetSystemLibrary')):Conv_ObjectToSoftObjectReference(a)end,retainTrigger=function(a,n)return StaticConstructObject(cls(n),a,0,0x40)end,key=keyCodes.toName,name=FName}
  local byName={};for _,a in ipairs(FindAllOf('InputAction')or{})do local n=full(a)and full(a):match('([^%.:/%s]+)$');if valid(a)and n then byName[n]=a end end
- local runtime=Runtime({category=category,nativeTargets=targets,resolve=function(n)return byName[n]end,valid=valid,path=path,unwrap=unwrap,same=function(a,b)return path(a)==path(b)end,each=each,retainInactive=function()local a=retain('InputAction','IA_TE_NativeActionGate');a.Triggers={};return a end,constructGate=function(a,n)return StaticConstructObject(cls('InputTriggerChordAction'),a,FName(n),0x40)end,chord=function(t)return unwrap(t.ChordAction)end,setChord=function(t,a)t.ChordAction=a end,setTriggers=function(a,v)a.Triggers=v end,rebuild=function()local lib=assert(StaticFindObject('/Script/EnhancedInput.Default__EnhancedInputLibrary'),'EnhancedInputLibrary unavailable');each(playerInput.AppliedInputContexts,function(c)c=unwrap(c);if valid(c)then lib:RequestRebuildControlMappingsUsingContext(c,false)end end);return true end,input=input})
+ local runtime=Runtime({category=category,nativeTargets=targets,resolve=function(n)return byName[n]end,valid=valid,path=path,unwrap=unwrap,same=function(a,b)return path(a)==path(b)end,each=each,retainInactive=function()local a=retain('InputAction','IA_KET_NativeActionGate');a.Triggers={};return a end,constructGate=function(a,n)return StaticConstructObject(cls('InputTriggerChordAction'),a,FName(n),0x40)end,chord=function(t)return unwrap(t.ChordAction)end,setChord=function(t,a)t.ChordAction=a end,setTriggers=function(a,v)a.Triggers=v end,rebuild=function()local lib=assert(StaticFindObject('/Script/EnhancedInput.Default__EnhancedInputLibrary'),'EnhancedInputLibrary unavailable');each(playerInput.AppliedInputContexts,function(c)c=unwrap(c);if valid(c)then lib:RequestRebuildControlMappingsUsingContext(c,false)end end);return true end,input=input})
  local api,internal={},false
  local function internalCall(fn)
   internal=true

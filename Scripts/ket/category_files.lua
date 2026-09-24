@@ -1,4 +1,4 @@
-local U = require('te.util')
+local U = require('ket.util')
 local M = {}
 
 local function normalized(path)

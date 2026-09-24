@@ -1,7 +1,7 @@
 package.path = 'Scripts/?.lua;' .. package.path
-local Categories = require('te.categories')
-local Registry = require('te.registry')
-local Lifecycle = require('te.lifecycle')
+local Categories = require('ket.categories')
+local Registry = require('ket.registry')
+local Lifecycle = require('ket.lifecycle')
 
 local calls = {}
 local deferCategory, failTemplate, failMode = false, false, nil

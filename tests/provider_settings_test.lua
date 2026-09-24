@@ -1,6 +1,6 @@
 package.path = 'Scripts/?.lua;' .. package.path
-local U, P = require('te.util'), require('te.provider_settings')
-local TE = require('te.init')
+local U, P = require('ket.util'), require('ket.provider_settings')
+local KET = require('ket.init')
 local checks = 0
 local function check(v) assert(v); checks=checks+1 end
 local function rejects(fn, text)
@@ -41,16 +41,19 @@ function template:attach(_,target,spec,previous)
 end
 function template:detach() return true end
 function template:render() return 'applied' end
-local te=TE.new({listFiles=function() return {'fixture.lua'} end,execute=function() return template end})
-te:loadTemplatesFromRegister()
-local menu=te:generateMenu()
-local Choices=dofile(assert(os.getenv('TE_DMM_CHOICES')))
-local Presentation=dofile(assert(os.getenv('TE_AMM_PRESENTATION')))
+local ket=KET.new({listFiles=function() return {'fixture.lua'} end,execute=function() return template end})
+ket:loadTemplatesFromRegister()
+local menu=ket:generateMenu()
+local Choices=dofile(assert(os.getenv('KET_DMM_CHOICES')))
+local Presentation=dofile(assert(os.getenv('KET_AMM_PRESENTATION')))
 local page=assert(menu.pageByCategory['player.quickslots'])
 local items=Presentation.parse(page.manifest,Choices.parse(page.manifest))
 local model=Choices.open({id='provider-test',choices=items,testOnly=true}); assert(not model.error,model.error)
 local index={}; for i,item in ipairs(items) do index[item.id]=i end
 local selector=menu.selectors['player.quickslots']; local value=next(selector.byValue)
+check(page.rows[index[selector.id]].ammLevel==2
+    and page.rows[index[selector.id]].ammType==nil
+    and page.rows[index[selector.id]].ammTabsWidth==nil)
 local def=menu.definitions['player.quickslots'][value]
 local provider=def.settings
 check(index[provider.WheelsDisplayed]>index[def.access])
@@ -81,22 +84,22 @@ spec.SecondaryX=900
 check(menu.decode(values)['player.quickslots'].settings.SecondaryX==40)
 local context={playerActions=dofile('tests/support/service.lua')(),targets={['player.quickslots']={}}}
 local invalidSpec=U.copy(spec);invalidSpec.PrimaryX=1001
-check(not te.runtime:apply('player.quickslots',menu.definitions['player.quickslots'][value].id,invalidSpec,context))
+check(not ket.runtime:apply('player.quickslots',menu.definitions['player.quickslots'][value].id,invalidSpec,context))
 invalidSpec=U.copy(spec);invalidSpec.Unexpected=1
-check(not te.runtime:apply('player.quickslots',menu.definitions['player.quickslots'][value].id,invalidSpec,context))
-check(te.runtime:commit({revision=1,values=values},menu.decode,context))
-local handle=te.runtime.active['player.quickslots'].handle
+check(not ket.runtime:apply('player.quickslots',menu.definitions['player.quickslots'][value].id,invalidSpec,context))
+check(ket.runtime:commit({revision=1,values=values},menu.decode,context))
+local handle=ket.runtime.active['player.quickslots'].handle
 values[provider.SecondaryX]=75
-check(te.runtime:commit({revision=2,values=values},menu.decode,context))
-check(attaches==2 and te.runtime.active['player.quickslots'].handle==handle)
-local _, committed=te.runtime:selection('player.quickslots')
+check(ket.runtime:commit({revision=2,values=values},menu.decode,context))
+check(attaches==2 and ket.runtime.active['player.quickslots'].handle==handle)
+local _, committed=ket.runtime:selection('player.quickslots')
 check(committed.SecondaryX==75)
 check(committed.shared[1].key==spec.shared[1].key and committed.access==spec.access)
 values[provider.PrimarySize]=201
 rejects(function() menu.decode(values) end,'invalid integer')
 local saved=menu.catalog
 declaration.fields[1].order=3
-local changed=te:generateMenu({catalog=saved})
+local changed=ket:generateMenu({catalog=saved})
 check(changed.definitions['player.quickslots'][value].settings.WheelsDisplayed==provider.WheelsDisplayed)
 local function invalid(change, message)
     local bad=U.copy(declaration); change(bad)

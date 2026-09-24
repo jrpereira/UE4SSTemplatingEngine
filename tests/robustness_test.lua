@@ -1,6 +1,6 @@
 package.path = 'Scripts/?.lua;' .. package.path
-local C, R = require('te.categories'), require('te.registry')
-local L, M = require('te.lifecycle'), require('te.menu')
+local C, R = require('ket.categories'), require('ket.registry')
+local L, M = require('ket.lifecycle'), require('ket.menu')
 local checks = 0
 local function check(v) assert(v); checks = checks + 1 end
 local function rejects(fn, part)
@@ -60,8 +60,8 @@ rejects(function() M.generate(registry, {catalog = {version = 1, next = 2, entri
 local reordered = M.generate(registry, {catalog = base.catalog, groupOrders = {[identity] = {'B', 'A'}}})
 local selected = next(base.selectors['player.quickslots'].byValue)
 local a, b = base.definitions['player.quickslots'][selected], reordered.definitions['player.quickslots'][selected]
-check(a.direct.A[1].key == 'TE_Slot1' and b.direct.A[1].key == 'TE_Slot3'
-    and a.groups.B.key == 'TE_Group2' and b.groups.B.key == 'TE_Group1')
+check(a.direct.A[1].key == 'KET_Slot1' and b.direct.A[1].key == 'KET_Slot3'
+    and a.groups.B.key == 'KET_Group2' and b.groups.B.key == 'KET_Group1')
 check(base.catalog.next == reordered.catalog.next)
 local defaults = {}
 for _, row in ipairs(base.rows) do defaults[row.Id] = tonumber(row.Default) end

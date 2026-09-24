@@ -1,4 +1,4 @@
-local TE = require('te.init')
+local KET = require('ket.init')
 
 local M = {}
 
@@ -13,12 +13,12 @@ end
 local function writeChanged(path, content)
     local old = read(path)
     if old == content then return false end
-    local temporary = path .. '.te.tmp'
+    local temporary = path .. '.ket.tmp'
     assert(not read(temporary), 'stale temporary menu file: ' .. temporary)
     local file = assert(io.open(temporary, 'wb'))
     assert(file:write(content))
     assert(file:close())
-    local backup = path .. '.te.bak'
+    local backup = path .. '.ket.bak'
     if old then
         assert(not read(backup), 'stale backup menu file: ' .. backup)
         local moved, why = os.rename(path, backup)
@@ -64,19 +64,20 @@ function M.prepare(root, options)
     assert(profile.mode == 'menu-test', 'unsupported installed profile')
     local categoryFiles = {}
     for _, path in ipairs(profile.categories or {}) do categoryFiles[#categoryFiles + 1] = root .. '/' .. path end
-    local te = TE.new({categoriesFolder=root .. '/Scripts/categories',
+    local ket = KET.new({categoriesFolder=root .. '/Scripts/categories',
         categoryFiles=categoryFiles, templatesFolder=root .. '/Scripts',
         listFiles=function() return {} end, resolveTarget=options.resolveTarget})
-    for _, path in ipairs(profile.templates) do te:registerTemplate(root .. '/' .. path) end
-    te:loadTemplatesFromRegister()
+    for _, path in ipairs(profile.templates) do ket:registerTemplate(root .. '/' .. path) end
+    ket:loadTemplatesFromRegister()
     local catalogFile = root .. '/identity-catalog.lua'
     local catalog = read(catalogFile) and assert(loadfile(catalogFile, 't', {}))() or nil
-    local menu = te:generateMenu({catalog=catalog, description=profile.description})
+    local menu = ket:generateMenu({catalog=catalog, description=profile.description,
+        externalQuickslotControls=true})
     -- Commit the identity reservation before publishing metadata that uses it.
     writeChanged(catalogFile, catalogSource(menu.catalog))
     writeChanged(root .. '/menu-pages.lua', pagesSource(menu.pages))
     writeChanged(root .. '/mod_settings.ini', menu.aggregate.manifest)
-    return te, menu
+    return ket, menu
 end
 
 return M

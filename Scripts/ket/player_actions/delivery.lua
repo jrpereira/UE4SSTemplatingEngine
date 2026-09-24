@@ -26,7 +26,7 @@ function M.deliver(template, state, definition, phase, service)
         return true
     end
     -- A detached wheel is no longer a child of the native switcher. The
-    -- selection still updates TE state, but cannot change its active index.
+    -- selection still updates KET state, but cannot change its active index.
     if template.detachSecondaryWheel == true then return true end
     return service:selectQuickslotGroup(state.selectedGroup)
 end

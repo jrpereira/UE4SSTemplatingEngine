@@ -1,10 +1,10 @@
 package.path = 'Scripts/?.lua;' .. package.path
 
-local Categories = require('te.categories')
-local Registry = require('te.registry')
-local Menu = require('te.menu')
-local Plan = require('te.player_actions.plan')
-local Layout = require('te.quickslot_layout')
+local Categories = require('ket.categories')
+local Registry = require('ket.registry')
+local Menu = require('ket.menu')
+local Plan = require('ket.player_actions.plan')
+local Layout = require('ket.quickslot_layout')
 
 local category = dofile('Scripts/categories/player_quickslots.lua')
 local categories = Categories.new()
@@ -29,15 +29,15 @@ local vertical = menu.definitions['player.quickslots'][choices[2]]
 assert(bottom.access == vertical.access)
 assert(bottom.direct['1'][1].key == vertical.direct['1'][1].key)
 assert(bottom.advanced['1'][1].key == vertical.advanced['1'][1].key)
-for _, sectionId in ipairs({'TE_PlayerQuickslotsShared', 'TE_PlayerQuickslotsAbilities',
-    'TE_PlayerQuickslotsConsumables', 'TE_PlayerQuickslotsGroups'}) do
+for _, sectionId in ipairs({'KET_PlayerQuickslotsShared', 'KET_PlayerQuickslotsAbilities',
+    'KET_PlayerQuickslotsConsumables', 'KET_PlayerQuickslotsGroups'}) do
     local section = assert(menu.fullManifest:match('%[Category%.' .. sectionId .. '%]([^[]+)'))
     for _, choice in ipairs(choices) do
         assert(section:find(tostring(choice) .. ':', 1, true),
             sectionId .. ' lacks label for template value ' .. choice)
     end
 end
-local sharedSection = assert(menu.fullManifest:match('%[Category%.TE_PlayerQuickslotsShared%]([^[]+)'))
+local sharedSection = assert(menu.fullManifest:match('%[Category%.KET_PlayerQuickslotsShared%]([^[]+)'))
 assert(sharedSection:find('ammHeading=0', 1, true))
 
 local rows, values, accessIndex = {}, {}, nil
@@ -54,7 +54,7 @@ values[bottom.access] = 2
 values[bottom.direct['1'][1].key] = 77
 values[bottom.advanced['1'][1].key] = 78
 local textId = assert(next(menu.textSettings))
-assert(textId == 'TE_PlayerQuickslotsAdvanced')
+assert(textId == 'KET_PlayerQuickslotsAdvanced')
 values[textId] = '1|10,-20,1.2,0.9|30,40,0.8,0.7'
 local layout = Layout.parse(values[textId])
 assert(layout.defaultWheel == 1 and layout.first.x == 10 and layout.second.opacity == 0.7)

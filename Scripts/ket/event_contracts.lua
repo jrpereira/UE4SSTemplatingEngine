@@ -1,4 +1,4 @@
-local U = require('te.util')
+local U = require('ket.util')
 local M = {}
 
 local indicatorClass='/Game/_Dawnwalker/UI/_Unified/Combat/WBP_CombatTargetIndicator.WBP_CombatTargetIndicator_C'

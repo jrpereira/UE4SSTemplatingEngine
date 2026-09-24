@@ -1,23 +1,23 @@
 local source = debug.getinfo(1, 'S').source:gsub('^@', '')
-local scripts = assert(source:match('^(.*)[/\\][^/\\]+$'), 'cannot locate TE Scripts')
-local root = assert(scripts:match('^(.*)[/\\]Scripts$'), 'cannot locate TE module')
+local scripts = assert(source:match('^(.*)[/\\][^/\\]+$'), 'cannot locate KET Scripts')
+local root = assert(scripts:match('^(.*)[/\\]Scripts$'), 'cannot locate KET module')
 package.path = scripts .. '/?.lua;' .. package.path
-local _, menu = require('te.menu_boot').prepare(root)
+local _, menu = require('ket.menu_boot').prepare(root)
 local definitions = {version=1, pages=menu.pages}
 
 assert(type(definitions) == 'table' and definitions.version == 1
-    and type(definitions.pages) == 'table', 'invalid TE menu page definitions')
+    and type(definitions.pages) == 'table', 'invalid KET menu page definitions')
 
 return {
-    id = 'UE4SSTemplatingEngine.CategoryPages',
+    id = 'ModCoreTemplates.CategoryPages',
     apiVersion = 1,
     install = function(api)
         assert(type(api) == 'table' and type(api.pages) == 'table'
             and type(api.pages.build) == 'function', 'DMM pages API unavailable')
         assert(type(api.choices) == 'table' and type(api.choices.parse) == 'function',
             'DMM choices API unavailable')
-        if api.pages._teCategoryPagesInstalled then return false end
-        api.pages._teCategoryPagesInstalled = true
+        if api.pages._ketCategoryPagesInstalled then return false end
+        api.pages._ketCategoryPagesInstalled = true
         local build = api.pages.build
         api.pages.build = function(tree, providers, status, hostApi)
             local generatedIds = {}
@@ -33,7 +33,7 @@ return {
             for _, provider in ipairs(providers) do ids[provider.id] = true end
             local aggregate
             for _, provider in ipairs(providers) do
-                if provider.name == 'Templates' then
+                if provider.id == 'ModCoreTemplates' then
                     local ownsPages = true
                     for _, page in ipairs(definitions.pages) do
                         ownsPages = ownsPages and type(page.id) == 'string'
@@ -41,20 +41,20 @@ return {
                             and ((type(page.category) == 'string') ~= (type(page.module) == 'string'))
                     end
                     if ownsPages then
-                        assert(aggregate == nil, 'duplicate TE aggregate provider')
+                        assert(aggregate == nil, 'duplicate KET aggregate provider')
                         aggregate = provider
                     end
                 end
             end
-            assert(aggregate ~= nil, 'TE aggregate provider unavailable')
+            assert(aggregate ~= nil, 'KET aggregate provider unavailable')
             local categoryProviders, moduleProviders = {}, {}
             for _, page in ipairs(definitions.pages) do
-                assert(type(page.id) == 'string' and not ids[page.id], 'duplicate TE category provider')
+                assert(type(page.id) == 'string' and not ids[page.id], 'duplicate KET category provider')
                 local choices = api.choices.parse(page.manifest)
                 local generated = {
                     id = page.id,
                     name = page.name,
-                    author = page.author or 'Templating Engine',
+                    author = page.author or 'ModCoreTemplates',
                     version = page.version or '0.0.19',
                     description = page.description or ('Templates and settings for ' .. page.name .. '.'),
                     choices = choices,
@@ -68,7 +68,7 @@ return {
                     generated.ammBrowserLevel, generated.ammBrowserIndent = 4, 20
                     categoryProviders[#categoryProviders + 1] = generated
                 else
-                    generated._teModule = assert(page.module, 'generated page needs category or module')
+                    generated._ketModule = assert(page.module, 'generated page needs category or module')
                     moduleProviders[#moduleProviders + 1] = generated
                 end
                 ids[page.id] = true
@@ -83,13 +83,13 @@ return {
             for index, provider in ipairs(providers) do
                 if provider == aggregate then aggregateIndex = index; break end
             end
-            assert(aggregateIndex ~= nil, 'TE aggregate provider lost during ordering')
+            assert(aggregateIndex ~= nil, 'KET aggregate provider lost during ordering')
             for index, provider in ipairs(categoryProviders) do
                 table.insert(providers, aggregateIndex + index, provider)
             end
             for _, generated in ipairs(moduleProviders) do
-                local wanted, match = generated._teModule:lower(), nil
-                generated._teModule = nil
+                local wanted, match = generated._ketModule:lower(), nil
+                generated._ketModule = nil
                 for index, provider in ipairs(providers) do
                     local id, name = tostring(provider.id or ''):lower(), tostring(provider.name or ''):lower()
                     if name == wanted or id == wanted or id == 'detected:ue4ss:' .. wanted then

@@ -1,6 +1,6 @@
 package.path = 'Scripts/?.lua;' .. package.path
 
-local Delivery = require('te.player_actions.delivery')
+local Delivery = require('ket.player_actions.delivery')
 local selected, activated = {}, {}
 local service = {}
 function service:selectQuickslotGroup(index)

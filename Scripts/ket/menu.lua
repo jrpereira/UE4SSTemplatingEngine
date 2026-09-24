@@ -1,6 +1,6 @@
-local U = require('te.util')
-local V = require('te.validation')
-local Provider = require('te.provider_settings')
+local U = require('ket.util')
+local V = require('ket.validation')
+local Provider = require('ket.provider_settings')
 local M = {}
 
 local function text(value)
@@ -51,10 +51,10 @@ function M.generate(registry, options)
         end
         return catalog.entries[name]
     end
-    local function id(parts) return 'TE_' .. allocate(parts) end
+    local function id(parts) return 'KET_' .. allocate(parts) end
     local publicIds = {}
     local function namedId(name, fallback)
-        local settingId = 'TE_' .. name
+        local settingId = 'KET_' .. name
         if publicIds[settingId] then settingId = id(fallback) end
         publicIds[settingId] = true
         return settingId
@@ -90,11 +90,13 @@ function M.generate(registry, options)
         for _, name in ipairs(names) do lines[#lines + 1] = name .. '=' .. tostring(fields[name]) end
         lines[#lines + 1] = ''
     end
-    emit('Mod', {Id = 'UE4SSTemplatingEngine', Name = 'Templates', Version = '0.0.19',
+    emit('Mod', {Id = 'ModCoreTemplates', Name = 'ModCore Templates', Version = '0.0.19',
         Description = options.description and text(options.description) or nil})
     local function row(fields)
         assert(#rows < 256, 'generated menu exceeds DMM limit of 256 settings')
-        fields.ConfigFile, fields.ConfigSection, fields.ConfigKey = 'config.ini', 'Templates', fields.Id
+        if fields.ammNavigation ~= 1 then
+            fields.ConfigFile, fields.ConfigSection, fields.ConfigKey = 'config.ini', 'Templates', fields.Id
+        end
         rows[#rows + 1] = fields
         fields._category = currentCategory
         fields._owner = currentOwner
@@ -192,7 +194,9 @@ function M.generate(registry, options)
                 local selectorName = category == 'player.quickslots' and 'Template'
                     or publicName(category) .. 'Template'
                 selector = namedId(selectorName, {'selector', category})
-                picker(selector, title(suffix), aggregateGroup, values, labels, nil, nil, true, 2, 440)
+                local isQuickslots = category == 'player.quickslots'
+                picker(selector, title(suffix), aggregateGroup, values, labels, nil, nil,
+                    not isQuickslots, isQuickslots and 1 or 2, not isQuickslots and 440 or nil)
                 rows[#rows]._control = true
                 aggregateRows[#aggregateRows + 1] = rows[#rows]
                 selectors[category] = {id = selector, byValue = byValue}
@@ -217,14 +221,19 @@ function M.generate(registry, options)
                     providerGroup.level, providerGroup.heading == false and 0 or nil,
                     publicName(category) .. publicName(providerGroup.id), categorySingle and values or nil)
                 for _, field in ipairs(providerGroup.fields) do
+                    if not (options.externalQuickslotControls and category == 'player.quickslots'
+                        and field.id == 'AccessMode') then
                     local settingId = namedId(publicName(category) .. publicName(field.id),
                         {'category_provider', category, field.id})
-                    local metadata = {Id=settingId, Label=field.label, Group=groupId, Type=field.type,
+                    local metadata = {Id=settingId, Label=field.label, Group=groupId,
+                        Type=field.type == 'navigation' and 'picker' or field.type,
                         Default=field.default, Description=field.description, ammLevel=field.level}
-                    if field.type == 'picker' then
+                    if field.type == 'picker' or field.type == 'navigation' then
                         metadata.PresetValues = table.concat(field.values, '|')
                         metadata.PresetLabels = table.concat(field.labels, '|')
                         metadata.ammType = field.tab and 'tab' or nil
+                        metadata.ammNavigation = field.type == 'navigation' and 1 or nil
+                        metadata.tabNavigation = field.tabNavigation
                     else
                         metadata.Minimum, metadata.Maximum, metadata.Step = field.min, field.max, field.step
                         metadata.Suffix = field.suffix
@@ -232,7 +241,8 @@ function M.generate(registry, options)
                     row(metadata)
                     rows[#rows]._control = true
                     aggregateRows[#aggregateRows + 1] = rows[#rows]
-                    sharedFields[field.id] = settingId
+                    if field.type ~= 'navigation' then sharedFields[field.id] = settingId end
+                    end
                 end
             end
             local sharedQuickslots
@@ -318,7 +328,8 @@ function M.generate(registry, options)
                 local scopePrefix = templateScope and templateScope .. '_' or ''
                 local definition = {id=entry.id,scope=templateScope,fields={},enabled=template.settings.enabled}
                 local providerGroups = Provider.normalize(template.settings)
-                definition.settings = {}
+                definition.settings, definition.navigation = {}, {}
+                local providerFieldIds = {}
                 decoded[category][value] = definition
                 local ownerSelector, ownerValue = selector, value
                 if not categorySingle then
@@ -345,25 +356,33 @@ function M.generate(registry, options)
                                     scopePrefix .. publicName(providerGroup.id))
                                 local settingId = namedId(scopePrefix .. publicName(field.id),
                                     {'provider', identity, field.id})
-                                local metadata = {Id=settingId, Label=field.label, Group=groupId, Type=field.type,
+                                local metadata = {Id=settingId, Label=field.label, Group=groupId,
+                                    Type=field.type == 'navigation' and 'picker' or field.type,
                                     Default=field.default, Description=field.description, ammLevel=field.level}
                                 if field.visibleWhen then
-                                    local sourceId = definition.settings[field.visibleWhen]
+                                    local sourceId = providerFieldIds[field.visibleWhen]
                                     assert(sourceId, 'provider visibility source must precede dependent field: '
                                         .. field.id)
                                     metadata.VisibleWhen = sourceId
                                     metadata.VisibleValues = table.concat(field.visibleValues, '|')
                                 end
-                                if field.type == 'picker' then
+                                if field.type == 'picker' or field.type == 'navigation' then
                                     metadata.PresetValues = table.concat(field.values, '|')
                                     metadata.PresetLabels = table.concat(field.labels, '|')
                                     metadata.ammType = field.tab and 'tab' or nil
+                                    metadata.ammNavigation = field.type == 'navigation' and 1 or nil
+                                    metadata.tabNavigation = field.tabNavigation
                                 else
                                     metadata.Minimum, metadata.Maximum, metadata.Step = field.min, field.max, field.step
                                     metadata.Suffix = field.suffix
                                 end
                                 row(metadata)
-                                definition.settings[field.id] = settingId
+                                providerFieldIds[field.id] = settingId
+                                if field.type == 'navigation' then
+                                    definition.navigation[field.id] = settingId
+                                else
+                                    definition.settings[field.id] = settingId
+                                end
                             end
                         end
                     end
@@ -376,7 +395,7 @@ function M.generate(registry, options)
                     definition.shared = sharedQuickslots.shared
                     definition.advanced = sharedQuickslots.advanced
                     emitProviderFields('AccessMethod')
-                elseif category == 'player.quickslots' then
+                elseif category == 'player.quickslots' and not options.externalQuickslotControls then
                     local ordered = V.orderedGroups(template, (options.groupOrders or {})[entry.id],
                         registry.categories:getCategory(category).actions)
                     local access = namedId(scopePrefix .. 'AccessMethod', {'access', identity})
@@ -487,6 +506,7 @@ function M.generate(registry, options)
         for _, r in ipairs(requiredRows) do
             local settingId = r.Id
             local value = values[settingId]
+            if value == nil and r.ammNavigation == 1 then value = tonumber(r.Default) end
             assert(type(value) == 'number' and value == value, 'missing/invalid setting ' .. settingId)
             if r.Type == 'integer' then
                 assert(value >= r.Minimum and value <= r.Maximum and value % 1 == 0,
@@ -513,6 +533,9 @@ function M.generate(registry, options)
                 end
                 for field, settingId in pairs(shared.fields) do
                     config[field] = effective[settingId]
+                end
+                if options.externalQuickslotControls and category == 'player.quickslots' then
+                    config.AccessMode = 0
                 end
                 Provider.validateCategory(registry.categories:getCategory(category).settings, config)
             end
@@ -572,11 +595,11 @@ function M.generate(registry, options)
         return result
       end
     end
-    local aggregateId = 'UE4SSTemplatingEngine'
-    local aggregateManifest = providerManifest(aggregateId, 'Templates', aggregateRows, true)
+    local aggregateId = 'ModCoreTemplates'
+    local aggregateManifest = providerManifest(aggregateId, 'ModCore Templates', aggregateRows, true)
     local allCategories = {}; for category in pairs(selectors) do allCategories[category] = true end
     for category in pairs(multiSelectors) do allCategories[category] = true end
-    local aggregate = {id=aggregateId, name='Templates', manifest=aggregateManifest, rows=aggregateRows,
+    local aggregate = {id=aggregateId, name='ModCore Templates', manifest=aggregateManifest, rows=aggregateRows,
         decode=makeDecoder(aggregateRows, allCategories)}
     local pages, pageByCategory, pageByModule, providers = {}, {}, {}, {[aggregateId]=aggregate}
     local ownerControls = {}
@@ -610,6 +633,24 @@ function M.generate(registry, options)
                 end
             end
         end
+        local quickslotsSelector = selectors['player.quickslots']
+            and selectors['player.quickslots'].id
+        local otherHeader = false
+        for _, item in ipairs(selected) do
+            if item.ammLevel == 1 and item.Id ~= quickslotsSelector then
+                otherHeader = true
+                break
+            end
+        end
+        if otherHeader then
+            for index, item in ipairs(selected) do
+                if item.Id == quickslotsSelector then
+                    local selectorRow = U.copy(item)
+                    selectorRow.ammLevel = 2
+                    selected[index] = selectorRow
+                end
+            end
+        end
         return selected
     end
     local categoryOwned, moduleOwned, moduleCategories = {}, {}, {}
@@ -627,6 +668,7 @@ function M.generate(registry, options)
             assert(module and module ~= '', entry.location
                 .. ': target=module requires a <Module>/Scripts/<file>.lua or '
                 .. '<Module>/Scripts/templates/<file>.lua registration path')
+            module = module:gsub('^_', '')
             moduleOwned[module], moduleCategories[module] = moduleOwned[module] or {}, moduleCategories[module] or {}
             moduleOwned[module][entry.id], moduleCategories[module][template.category] = true, true
         end

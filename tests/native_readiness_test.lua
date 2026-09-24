@@ -1,5 +1,5 @@
 package.path = 'Scripts/?.lua;' .. package.path
-local Readiness = require('te.player_actions.readiness')
+local Readiness = require('ket.player_actions.readiness')
 local checks = 0
 local function check(v) assert(v); checks = checks + 1 end
 local queue, timers, logs, runs = {}, {}, {}, 0
