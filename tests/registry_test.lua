@@ -104,7 +104,8 @@ rejects(function() V.flatten({category='player.quickslots',name='Bad',
 local invalid = template(); invalid.category = 'npc.actions'
 rejects(function() V.flatten(invalid, categories, 'bad.lua') end, 'unregistered category')
 invalid = template(); invalid.actions = nil
-rejects(function() V.flatten({{invalid}}, categories, 'bad.lua') end, 'bad.lua[1][1].actions')
+local visualOnly = V.flatten({{invalid}}, categories, 'visual.lua')
+check(#visualOnly == 1 and visualOnly[1].actions == nil)
 rejects(function() V.flatten({[1] = template(), [3] = template()}, categories, 'bad.lua') end, 'sparse array')
 rejects(function() V.flatten({template(), surprise = 1}, categories, 'bad.lua') end, 'dense array')
 local cycle = {}; cycle[1] = cycle

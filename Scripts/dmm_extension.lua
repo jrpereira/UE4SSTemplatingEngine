@@ -55,7 +55,7 @@ return {
                     id = page.id,
                     name = page.name,
                     author = page.author or 'ModCoreTemplates',
-                    version = page.version or '0.0.19',
+                    version = page.version or '0.0.20',
                     description = page.description or ('Templates and settings for ' .. page.name .. '.'),
                     choices = choices,
                     settingsCount = #choices,
@@ -65,7 +65,7 @@ return {
                     logoAsset = '',
                 }
                 if page.category then
-                    generated.ammBrowserLevel, generated.ammBrowserIndent = 4, 20
+                    generated.mcBrowserLevel, generated.mcBrowserIndent = 4, 20
                     categoryProviders[#categoryProviders + 1] = generated
                 else
                     generated._ketModule = assert(page.module, 'generated page needs category or module')
@@ -101,7 +101,7 @@ return {
                     table.remove(providers, match)
                     table.insert(providers, match, generated)
                 elseif match then
-                    generated.ammBrowserLevel, generated.ammBrowserIndent = 4, 20
+                    generated.mcBrowserLevel, generated.mcBrowserIndent = 4, 20
                     table.insert(providers, match + 1, generated)
                 elseif previousPositions[generated.id] then
                     table.insert(providers, math.min(previousPositions[generated.id], #providers + 1), generated)

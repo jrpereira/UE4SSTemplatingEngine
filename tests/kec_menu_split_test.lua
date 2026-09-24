@@ -24,6 +24,6 @@ assert(ids.KET_Template)
 local selected = assert(next(menu.selectors['player.quickslots'].byValue))
 values.KET_Template = selected
 local decoded = menu.decode(values)['player.quickslots']
-assert(decoded.id and decoded.settings.AccessMode == 0)
+assert(decoded.id and decoded.settings.AccessMode == nil)
 assert(decoded.settings.access == nil and decoded.settings.direct == nil)
 print('KET menu leaves quickslot Access Method and slots to KEC')

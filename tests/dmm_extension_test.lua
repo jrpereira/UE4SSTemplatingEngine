@@ -49,11 +49,11 @@ local ok, failure = xpcall(function()
     check(#providers == #expected)
     for index, id in ipairs(expected) do check(providers[index].id == id, 'provider order mismatch at '..index) end
     for index = 4, 5 do
-        check(providers[index].ammBrowserLevel == 4)
-        check(providers[index].ammBrowserIndent == 20)
+        check(providers[index].mcBrowserLevel == 4)
+        check(providers[index].mcBrowserIndent == 20)
         check(providers[index].settingsCount == 1 and #providers[index].choices == 1)
     end
-    check(providers[6].ammBrowserLevel == nil and providers[6].ammBrowserIndent == nil
+    check(providers[6].mcBrowserLevel == nil and providers[6].mcBrowserIndent == nil
         and providers[6].name == 'QuickslotsForever')
     check(buildApi.pages.build(tree, providers, status, hostApi) == 'built')
     check(#providers == #expected)

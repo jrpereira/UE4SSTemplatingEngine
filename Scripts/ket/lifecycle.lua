@@ -53,6 +53,13 @@ function M.new(registry, options)
         if target == nil and options.resolveTarget then
             target = options.resolveTarget(category, context, definition)
         end
+        if target == nil and type(definition.paths) == 'table' and type(service.findObject) == 'function' then
+            -- A single declared path is the category target; no widget-specific behavior here.
+            local _, path = next(definition.paths)
+            local count = 0
+            for _ in pairs(definition.paths) do count = count + 1 end
+            if count == 1 then target = service:findObject(path) end
+        end
         return target
     end
     local function guarded(operation)

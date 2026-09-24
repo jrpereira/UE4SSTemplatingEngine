@@ -45,7 +45,7 @@ local function ensureConfig(path, rows, textSettings)
         return false
     end
     for _, row in ipairs(rows) do
-        if row.ammNavigation ~= 1 then
+        if row.mcNavigation ~= 1 then
             local index = present[row.Id]
             if not index then
                 local default = tonumber(row.Default)

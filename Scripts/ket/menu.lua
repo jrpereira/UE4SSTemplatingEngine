@@ -90,11 +90,11 @@ function M.generate(registry, options)
         for _, name in ipairs(names) do lines[#lines + 1] = name .. '=' .. tostring(fields[name]) end
         lines[#lines + 1] = ''
     end
-    emit('Mod', {Id = 'ModCoreTemplates', Name = 'ModCore Templates', Version = '0.0.19',
+    emit('Mod', {Id = 'ModCoreTemplates', Name = 'ModCore Templates', Version = '0.0.20',
         Description = options.description and text(options.description) or nil})
     local function row(fields)
         assert(#rows < 256, 'generated menu exceeds DMM limit of 256 settings')
-        if fields.ammNavigation ~= 1 then
+        if fields.mcNavigation ~= 1 then
             fields.ConfigFile, fields.ConfigSection, fields.ConfigKey = 'config.ini', 'Templates', fields.Id
         end
         rows[#rows + 1] = fields
@@ -109,9 +109,9 @@ function M.generate(registry, options)
         return row({Id = settingId, Label = text(label), Group = group, Type = 'picker',
             PresetValues = table.concat(values, '|'), PresetLabels = table.concat(labels, '|'),
             Default = default == nil and values[1] or default,
-            VisibleWhen = source, VisibleValues = visible, ammLevel = level,
-            ammType = compact and #values <= 8 and 'tab' or nil,
-            ammTabsWidth = compact and #values <= 8 and tabsWidth or nil})
+            VisibleWhen = source, VisibleValues = visible, mcLevel = level,
+            mcType = compact and #values <= 8 and 'tab' or nil,
+            mcTabsWidth = compact and #values <= 8 and tabsWidth or nil})
     end
     local function group(identity, label, selector, selected, source, visible, level, heading, publicId,
         labelValues)
@@ -127,8 +127,8 @@ function M.generate(registry, options)
                 labels[1] = tostring(selected) .. ':' .. text(label)
             end
             local fields = {VisibleWhen = source, VisibleValues = visible,
-                ammLevel = level or 3, ammHeading = heading, ammLabelWhen = selector,
-                ammLabels = table.concat(labels, ';')}
+                mcLevel = level or 3, mcHeading = heading, mcLabelWhen = selector,
+                mcLabels = table.concat(labels, ';')}
             groupSections[groupId] = fields
             groupOrder[#groupOrder + 1] = groupId
             emit('Category.' .. groupId, fields)
@@ -140,12 +140,12 @@ function M.generate(registry, options)
         local modeId = settingId .. 'Mode'
         local modeLabels = #modeValues == 3 and modeValues[3] == -1 and 'Tap|Hold|Default' or 'Tap|Hold'
         row({Id = settingId, Type = 'integer', Label = text(label), Group = groupId,
-            Minimum = 0, Maximum = 254, Step = 1, Default = defaultKey or 0, ammType = 'keybind',
+            Minimum = 0, Maximum = 254, Step = 1, Default = defaultKey or 0, mcType = 'keybind',
             VisibleWhen = source, VisibleValues = visible})
         row({Id = modeId, Type = 'picker', Label = text(label), Group = groupId,
             PresetValues = table.concat(modeValues, '|'), PresetLabels = modeLabels,
             Default = defaultMode == nil and modeValues[1] or defaultMode,
-            ammType = 'tab', Pair = settingId, VisibleWhen = source, VisibleValues = visible})
+            mcType = 'tab', Pair = settingId, VisibleWhen = source, VisibleValues = visible})
         bindings[identity] = {key = settingId, mode = modeId}
         return bindings[identity]
     end
@@ -227,12 +227,12 @@ function M.generate(registry, options)
                         {'category_provider', category, field.id})
                     local metadata = {Id=settingId, Label=field.label, Group=groupId,
                         Type=field.type == 'navigation' and 'picker' or field.type,
-                        Default=field.default, Description=field.description, ammLevel=field.level}
+                        Default=field.default, Description=field.description, mcLevel=field.level}
                     if field.type == 'picker' or field.type == 'navigation' then
                         metadata.PresetValues = table.concat(field.values, '|')
                         metadata.PresetLabels = table.concat(field.labels, '|')
-                        metadata.ammType = field.tab and 'tab' or nil
-                        metadata.ammNavigation = field.type == 'navigation' and 1 or nil
+                        metadata.mcType = field.tab and 'tab' or nil
+                        metadata.mcNavigation = field.type == 'navigation' and 1 or nil
                         metadata.tabNavigation = field.tabNavigation
                     else
                         metadata.Minimum, metadata.Maximum, metadata.Step = field.min, field.max, field.step
@@ -358,7 +358,7 @@ function M.generate(registry, options)
                                     {'provider', identity, field.id})
                                 local metadata = {Id=settingId, Label=field.label, Group=groupId,
                                     Type=field.type == 'navigation' and 'picker' or field.type,
-                                    Default=field.default, Description=field.description, ammLevel=field.level}
+                                    Default=field.default, Description=field.description, mcLevel=field.level}
                                 if field.visibleWhen then
                                     local sourceId = providerFieldIds[field.visibleWhen]
                                     assert(sourceId, 'provider visibility source must precede dependent field: '
@@ -369,8 +369,8 @@ function M.generate(registry, options)
                                 if field.type == 'picker' or field.type == 'navigation' then
                                     metadata.PresetValues = table.concat(field.values, '|')
                                     metadata.PresetLabels = table.concat(field.labels, '|')
-                                    metadata.ammType = field.tab and 'tab' or nil
-                                    metadata.ammNavigation = field.type == 'navigation' and 1 or nil
+                                    metadata.mcType = field.tab and 'tab' or nil
+                                    metadata.mcNavigation = field.type == 'navigation' and 1 or nil
                                     metadata.tabNavigation = field.tabNavigation
                                 else
                                     metadata.Minimum, metadata.Maximum, metadata.Step = field.min, field.max, field.step
@@ -395,7 +395,8 @@ function M.generate(registry, options)
                     definition.shared = sharedQuickslots.shared
                     definition.advanced = sharedQuickslots.advanced
                     emitProviderFields('AccessMethod')
-                elseif category == 'player.quickslots' and not options.externalQuickslotControls then
+                elseif category == 'player.quickslots' and not options.externalQuickslotControls
+                    and (registry.categories:getCategory(category).actions or template.actions) then
                     local ordered = V.orderedGroups(template, (options.groupOrders or {})[entry.id],
                         registry.categories:getCategory(category).actions)
                     local access = namedId(scopePrefix .. 'AccessMethod', {'access', identity})
@@ -464,10 +465,10 @@ function M.generate(registry, options)
         local output = {}
         local headerPickers = 0
         for _, item in ipairs(selectedRows) do
-            if item.ammLevel == 1 then headerPickers = headerPickers + 1 end
+            if item.mcLevel == 1 then headerPickers = headerPickers + 1 end
         end
         assert(headerPickers <= 1, providerName .. ': only one level-1 picker per page')
-        append(output, 'Mod', {Id=providerId, Name=providerName, Version='0.0.19',
+        append(output, 'Mod', {Id=providerId, Name=providerName, Version='0.0.20',
             Description=options.description and text(options.description) or nil})
         local usedGroups, visibleGroups, hiddenByGroup = {}, {}, {}
         for _, item in ipairs(selectedRows) do
@@ -477,7 +478,7 @@ function M.generate(registry, options)
         end
         for _, groupId in ipairs(aggregateGroupOrder) do
             if usedGroups[groupId] then
-                append(output, 'Category.' .. groupId, aggregatePage and {} or {ammHeading=0})
+                append(output, 'Category.' .. groupId, aggregatePage and {} or {mcHeading=0})
             end
         end
         for _, groupId in ipairs(groupOrder) do
@@ -506,11 +507,11 @@ function M.generate(registry, options)
         for _, r in ipairs(requiredRows) do
             local settingId = r.Id
             local value = values[settingId]
-            if value == nil and r.ammNavigation == 1 then value = tonumber(r.Default) end
+            if value == nil and r.mcNavigation == 1 then value = tonumber(r.Default) end
             assert(type(value) == 'number' and value == value, 'missing/invalid setting ' .. settingId)
             if r.Type == 'integer' then
                 assert(value >= r.Minimum and value <= r.Maximum and value % 1 == 0,
-                    (r.ammType == 'keybind' and 'invalid key ' or 'invalid integer ') .. settingId)
+                    (r.mcType == 'keybind' and 'invalid key ' or 'invalid integer ') .. settingId)
             else
                 local found = false
                 for candidate in r.PresetValues:gmatch('[^|]+') do if value == tonumber(candidate) then found = true end end
@@ -534,7 +535,8 @@ function M.generate(registry, options)
                 for field, settingId in pairs(shared.fields) do
                     config[field] = effective[settingId]
                 end
-                if options.externalQuickslotControls and category == 'player.quickslots' then
+                if options.externalQuickslotControls and category == 'player.quickslots'
+                    and shared.fields.AccessMode then
                     config.AccessMode = 0
                 end
                 Provider.validateCategory(registry.categories:getCategory(category).settings, config)
@@ -621,7 +623,7 @@ function M.generate(registry, options)
                 if item._control or (item._owner and owned[item._owner]) then
                     if item.Id == headerSelector then
                         local header = U.copy(item)
-                        header.ammLevel = 1
+                        header.mcLevel = 1
                         selected[#selected + 1] = header
                     else
                         selected[#selected + 1] = item
@@ -637,7 +639,7 @@ function M.generate(registry, options)
             and selectors['player.quickslots'].id
         local otherHeader = false
         for _, item in ipairs(selected) do
-            if item.ammLevel == 1 and item.Id ~= quickslotsSelector then
+            if item.mcLevel == 1 and item.Id ~= quickslotsSelector then
                 otherHeader = true
                 break
             end
@@ -646,7 +648,7 @@ function M.generate(registry, options)
             for index, item in ipairs(selected) do
                 if item.Id == quickslotsSelector then
                     local selectorRow = U.copy(item)
-                    selectorRow.ammLevel = 2
+                    selectorRow.mcLevel = 2
                     selected[index] = selectorRow
                 end
             end

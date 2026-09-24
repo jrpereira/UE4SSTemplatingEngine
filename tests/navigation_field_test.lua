@@ -31,14 +31,14 @@ for _, row in ipairs(page.rows) do
     elseif row.Label=='Size' then size=row
     elseif row.Id=='KET_Template' then selector=row end
 end
-assert(nav and nav.Type=='picker' and nav.ammNavigation==1 and nav.ammType=='tab'
+assert(nav and nav.Type=='picker' and nav.mcNavigation==1 and nav.mcType=='tab'
     and nav.tabNavigation==1 and page.manifest:find('tabNavigation=1',1,true))
 assert(nav.ConfigFile==nil and nav.ConfigSection==nil and nav.ConfigKey==nil)
 local definition=assert(menu.definitions['player.quickslots'][next(menu.selectors['player.quickslots'].byValue)])
 assert(definition.navigation.View==nav.Id and definition.settings.View==nil)
 assert(size and size.VisibleWhen==nav.Id and size.VisibleValues=='1')
-assert(selector and selector.ammLevel==1 and selector.ammType==nil
-    and selector.ammTabsWidth==nil)
+assert(selector and selector.mcLevel==1 and selector.mcType==nil
+    and selector.mcTabsWidth==nil)
 local values={}
 for _, row in ipairs(page.rows) do
     if row~=nav then values[row.Id]=tonumber(row.Default) end

@@ -1,0 +1,11 @@
+{
+  "manifest_version": 1,
+  "id": "ModCoreTemplates",
+  "name": "ModCore Templates",
+  "description": "Build modular game-feature and UI customizations as Lua templates. Provides category registration, generated settings menus, target discovery, and attach/render/detach lifecycle management.",
+  "version_source": "Scripts/main.lua",
+  "links": {
+    "source": "https://github.com/jrpereira/ModCoreTemplates",
+    "nexus": "https://www.nexusmods.com/thebloodofdawnwalker/mods/641"
+  }
+}

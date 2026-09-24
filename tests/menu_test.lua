@@ -10,8 +10,8 @@ local function rejects(fn, fragment)
     checks = checks + 1
 end
 local dmmPath = assert(os.getenv('KET_DMM_CHOICES'), 'KET_DMM_CHOICES required for actual parser integration tests')
-local ammPath = assert(os.getenv('KET_AMM_PRESENTATION'), 'KET_AMM_PRESENTATION required for actual decorator tests')
-local Choices, Presentation = dofile(dmmPath), dofile(ammPath)
+local mcPath = assert(os.getenv('KET_AMM_PRESENTATION'), 'KET_AMM_PRESENTATION required for actual decorator tests')
+local Choices, Presentation = dofile(dmmPath), dofile(mcPath)
 local function fixture(last, name)
     return {name = name or 'Quickslots++', category = 'player.quickslots',
         settings={target='templates',enabled=false}, actions = {
@@ -47,20 +47,20 @@ for _, last in ipairs({2, 5}) do
         and #result.pageByCategory['player.quickslots'].rows == #result.rows
         and result.pageByCategory['player.stats'] == nil)
     check(result.aggregate.rows[1].Label == 'Quickslots' and result.aggregate.rows[1].Group == 'Player'
-        and result.aggregate.rows[1].ammType == nil
-        and result.aggregate.rows[1].ammTabsWidth == nil)
+        and result.aggregate.rows[1].mcType == nil
+        and result.aggregate.rows[1].mcTabsWidth == nil)
     local quickslotsManifest = result.pageByCategory['player.quickslots'].manifest
     check(not result.manifest:find('Deco', 1, true) and not quickslotsManifest:find('Deco', 1, true))
-    for _, key in ipairs({'ammType','ammLevel','ammHeading','ammLabelWhen','ammLabels'}) do
+    for _, key in ipairs({'mcType','mcLevel','mcHeading','mcLabelWhen','mcLabels'}) do
         check(quickslotsManifest:find(key, 1, true), 'missing AMM metadata key '..key)
     end
     local model, indices = modelFor(result, 'player.quickslots')
     local rowsById = {}; for _, item in ipairs(result.rows) do rowsById[item.Id] = item end
     local selector = result.selectors['player.quickslots']
-    check(result.aggregate.rows[1].ammLevel == 1
-        and result.pageByCategory['player.quickslots'].rows[1].ammLevel == 1)
-    check(model.items[indices[selector.id]].ammHeader
-        and not model.items[indices[selector.id]].ammTabs)
+    check(result.aggregate.rows[1].mcLevel == 1
+        and result.pageByCategory['player.quickslots'].rows[1].mcLevel == 1)
+    check(model.items[indices[selector.id]].mcHeader
+        and not model.items[indices[selector.id]].mcTabs)
     local selected = next(selector.byValue)
     local definition = result.definitions['player.quickslots'][selected]
     local scopePrefix = 'KET_'
@@ -81,15 +81,15 @@ for _, last in ipairs({2, 5}) do
     end
     for _, slots in pairs(definition.direct) do
         for _, pair in ipairs(slots) do
-            check(rowsById[pair.key].Pair == nil and rowsById[pair.key].ammType == 'keybind')
-            check(rowsById[pair.mode].Pair == pair.key and rowsById[pair.mode].ammType == 'tab')
+            check(rowsById[pair.key].Pair == nil and rowsById[pair.key].mcType == 'keybind')
+            check(rowsById[pair.mode].Pair == pair.key and rowsById[pair.mode].mcType == 'tab')
             check(rowsById[pair.mode].Label == rowsById[pair.key].Label)
         end
     end
     check(model.items[indices[selector.id]].default==0 and definition.enabled==false)
     check(model.items[indices[definition.access]].default == 1
         and model.items[indices[definition.access]].label == 'Input Method'
-        and model.items[indices[definition.access]].ammTabsWidth == 440)
+        and model.items[indices[definition.access]].mcTabsWidth == 440)
     check(model.items[indices[definition.groups['2'].key]].default == 164)
     for slot = 1, 4 do
         check(model.items[indices[definition.direct['1'][slot].key]].default == 48 + slot)
@@ -97,10 +97,10 @@ for _, last in ipairs({2, 5}) do
         check(model.items[indices[definition.direct['2'][slot].key]].default == 48 + slot)
         check(model.items[indices[definition.direct['2'][slot].mode]].default == 1)
     end
-    check(model.items[indices[selector.id]].ammFont == 1)
-    check(model.items[indices[definition.access]].ammFont == 2)
-    check(model.items[indices[selector.id]].ammGroup.heading == false)
-    check(model.items[indices[definition.access]].ammGroup.heading == false)
+    check(model.items[indices[selector.id]].mcFont == 1)
+    check(model.items[indices[definition.access]].mcFont == 2)
+    check(model.items[indices[selector.id]].mcGroup.heading == false)
+    check(model.items[indices[definition.access]].mcGroup.heading == false)
     local activationGroup = model.items[indices[definition.groups['1'].key]].group
     local blocks, previous = 0, nil
     for _, item in ipairs(model.items) do
@@ -116,7 +116,7 @@ for _, last in ipairs({2, 5}) do
         for i, item in ipairs(model.items) do
             if visibility[i] and item.kind == 'slider' then count = count + 1 end
             if item.kind == 'slider' then
-                check(item.ammPairIndex ~= nil and visibility[i] == visibility[item.ammPairIndex])
+                check(item.mcPairIndex ~= nil and visibility[i] == visibility[item.mcPairIndex])
             end
         end
         return count
@@ -130,7 +130,7 @@ for _, last in ipairs({2, 5}) do
     model:set(indices[definition.access], 0)
     check(visibleKeys() == 8 + last)
     for _, slots in pairs(definition.direct) do
-        check(model.items[indices[slots[1].key]].ammGroup.font == 5)
+        check(model.items[indices[slots[1].key]].mcGroup.font == 5)
     end
     model:set(indices[definition.access], 1)
     check(visibleKeys() == 3 + math.max(4, last))
@@ -163,8 +163,8 @@ for i = 1, 8 do many[i] = {category = 'player.stats', name = 'Stats ' .. i,
     settings={target='templates',enabled=false}} end
 local ordinary = Menu.generate(registryFor(many))
 local model, indices = modelFor(ordinary, 'player.stats')
-check(not model.items[indices[ordinary.selectors['player.stats'].id]].ammTabs
-    and ordinary.aggregate.rows[1].ammTabsWidth == nil)
+check(not model.items[indices[ordinary.selectors['player.stats'].id]].mcTabs
+    and ordinary.aggregate.rows[1].mcTabsWidth == nil)
 local overrideFixture=fixture(2,'Override');overrideFixture.single=false
 local overrideMenu=Menu.generate(registryFor(overrideFixture))
 check(overrideMenu.selectors['player.quickslots']==nil
@@ -212,25 +212,25 @@ check(#grouped.aggregate.rows == 3 and #grouped.pages == 3)
 check(grouped.aggregate.rows[1]._category == 'menu.fixes'
     and grouped.aggregate.rows[1].Id == 'KET_CategorySeparator_MenuFix'
     and grouped.aggregate.rows[1].Label == 'Menu Fix' and grouped.aggregate.rows[1].Group == 'Menu'
-    and grouped.aggregate.rows[1].ammTabsWidth == 440)
+    and grouped.aggregate.rows[1].mcTabsWidth == 440)
 check(grouped.aggregate.rows[2]._category == 'player.quickslots'
     and grouped.aggregate.rows[2].Label == 'Quickslots' and grouped.aggregate.rows[2].Group == 'Player'
-    and grouped.aggregate.rows[2].ammLevel == 1
-    and grouped.aggregate.rows[2].ammType == nil
-    and grouped.aggregate.rows[2].ammTabsWidth == nil)
+    and grouped.aggregate.rows[2].mcLevel == 1
+    and grouped.aggregate.rows[2].mcType == nil
+    and grouped.aggregate.rows[2].mcTabsWidth == nil)
 check(grouped.aggregate.rows[3]._category == 'player.stats'
     and grouped.aggregate.rows[3].Label == 'Stats' and grouped.aggregate.rows[3].Group == 'Player'
-    and grouped.aggregate.rows[3].ammTabsWidth == 440)
+    and grouped.aggregate.rows[3].mcTabsWidth == 440)
 check(grouped.pageByCategory['menu.controls'] == nil and grouped.pageByCategory['menu.templates'] == nil
     and grouped.pageByCategory['player.charges'] == nil)
 check(grouped.manifest:find('[Category.Menu]', 1, true)
     and grouped.manifest:find('[Category.Player]', 1, true)
-    and grouped.manifest:find('ammTabsWidth=440', 1, true)
+    and grouped.manifest:find('mcTabsWidth=440', 1, true)
     and not grouped.manifest:find('[Category.Templates]', 1, true))
 local groupedModel = modelFor(grouped)
-check(groupedModel.items[1].group == 'Menu' and groupedModel.items[1].ammGroup.heading
-    and groupedModel.items[2].group == 'Player' and groupedModel.items[2].ammGroup.heading
-    and groupedModel.items[3].group == 'Player' and groupedModel.items[3].ammGroup.heading)
+check(groupedModel.items[1].group == 'Menu' and groupedModel.items[1].mcGroup.heading
+    and groupedModel.items[2].group == 'Player' and groupedModel.items[2].mcGroup.heading
+    and groupedModel.items[3].group == 'Player' and groupedModel.items[3].mcGroup.heading)
 local routedCategories = Categories.new()
 routedCategories:registerCategory('player', {'quickslots'})
 routedCategories:setCategory('player.quickslots', {single=true})

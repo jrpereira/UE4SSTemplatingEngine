@@ -51,19 +51,19 @@ local items=Presentation.parse(page.manifest,Choices.parse(page.manifest))
 local model=Choices.open({id='provider-test',choices=items,testOnly=true}); assert(not model.error,model.error)
 local index={}; for i,item in ipairs(items) do index[item.id]=i end
 local selector=menu.selectors['player.quickslots']; local value=next(selector.byValue)
-check(page.rows[index[selector.id]].ammLevel==2
-    and page.rows[index[selector.id]].ammType==nil
-    and page.rows[index[selector.id]].ammTabsWidth==nil)
+check(page.rows[index[selector.id]].mcLevel==2
+    and page.rows[index[selector.id]].mcType==nil
+    and page.rows[index[selector.id]].mcTabsWidth==nil)
 local def=menu.definitions['player.quickslots'][value]
 local provider=def.settings
 check(index[provider.WheelsDisplayed]>index[def.access])
 check(index[provider.WheelsDisplayed]<index[provider.PrimaryWheel])
 check(index[provider.PrimaryOpacity]<index[provider.SecondaryX])
-check(items[index[provider.WheelsDisplayed]].ammTabs and items[index[provider.PrimaryX]].ammGroup.font==4)
-check(items[index[provider.WheelsDisplayed]].ammHeader
-    and items[index[provider.WheelsDisplayed]].ammFont==1)
-check(items[index[provider.WheelsDisplayed]].ammGroup.heading==false
-    and items[index[provider.PrimaryWheel]].ammGroup.heading==false)
+check(items[index[provider.WheelsDisplayed]].mcTabs and items[index[provider.PrimaryX]].mcGroup.font==4)
+check(items[index[provider.WheelsDisplayed]].mcHeader
+    and items[index[provider.WheelsDisplayed]].mcFont==1)
+check(items[index[provider.WheelsDisplayed]].mcGroup.heading==false
+    and items[index[provider.PrimaryWheel]].mcGroup.heading==false)
 check(items[index[provider.PrimarySize]].suffix=='%')
 model:set(index[selector.id],value)
 model:set(index[provider.WheelsDisplayed],1)

@@ -1,9 +1,15 @@
 # Changelog
 
-## Unreleased
+## 0.0.20
 
-- Rename the module to KEngineTemplates (KET), with UE4SS mod folder `_KEngineTemplates` and DMM provider ID `KEngineTemplates`. Use the `ket.*` API and `KET_` saved setting IDs.
-- Require KEngineBridge API 5 for native Enhanced Input delivery.
+- Align category and lifecycle tests with visual-only quickslot ownership.
+
+- Refine template metadata, generated menus, and lifecycle handling.
+- Keep wheel mutation and restoration with the consuming template.
+- Add focused developer and build guides with project metadata.
+
+- Use the ModCoreTemplates provider and `_ModCore_Templates` installation folder, retaining the `ket.*` API and `KET_` setting IDs.
+- Keep visual template selection separate from ModCoreControls input handling.
 - Preserve `tabNavigation=1` on navigation tabs and expose their generated IDs through `definition.navigation` without a config binding.
 
 ## 0.0.19 - 2026-09-23

@@ -1,4 +1,4 @@
-local VERSION = '0.0.19'
+local VERSION = '0.0.20'
 local source = debug.getinfo(1, 'S').source:gsub('^@', '')
 local scripts = assert(source:match('^(.*)[/\\][^/\\]+$'), 'cannot locate KET Scripts')
 local root = assert(scripts:match('^(.*)[/\\]Scripts$'), 'cannot locate KET module')

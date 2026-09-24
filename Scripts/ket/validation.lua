@@ -66,7 +66,7 @@ function M.template(template, categories, where, runtime)
     Provider.normalize(template.settings)
     assert(template.modules==nil,where..'.modules: declare native targets inside events')
     Events.validate(template.category, category.events or template.events, template.subscribe, where)
-    if template.category == 'player.quickslots' then
+    if template.category == 'player.quickslots' and (category.actions or template.actions) then
         M.actions(category.actions or template.actions, where .. '.actions')
         if template.actionOrder ~= nil then M.orderedGroups(template, nil, category.actions) end
     end
