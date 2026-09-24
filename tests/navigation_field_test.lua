@@ -21,10 +21,10 @@ local categories=Categories.new()
 categories:registerCategory('player',{'quickslots'})
 categories:setCategory('player.quickslots',{single=true})
 local registry=Registry.new(categories,{execute=function()return template end})
-registry:registerTemplate('ActionFandango/Scripts/templates/main.lua')
+registry:registerTemplate('ActionFangdango/Scripts/templates/main.lua')
 registry:loadTemplatesFromRegister()
 local menu=Menu.generate(registry)
-local page=assert(menu.pageByModule.ActionFandango)
+local page=assert(menu.pageByModule.ActionFangdango)
 local nav, size, selector
 for _, row in ipairs(page.rows) do
     if row.Label=='View' then nav=row
