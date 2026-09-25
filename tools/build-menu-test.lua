@@ -34,6 +34,6 @@ lines[#lines+1]='}}\n';write('identity-catalog.lua',table.concat(lines,'\n'))
 local categoryPaths = CategoryFiles.list('Scripts/categories')
 local categories = {}
 for _, path in ipairs(categoryPaths) do categories[#categories + 1] = string.format('%q', path) end
-write('menu-profile.lua','return {mode="menu-test",categories={'..table.concat(categories,',')..'},templates={"Scripts/default.lua","../Fangdango/Scripts/templates/main.lua"},description='..string.format('%q',description)..'}\n')
+write('menu-profile.lua','return {mode="menu-test",categories={'..table.concat(categories,',')..'},templates={"Scripts/default.lua","../Fangdango/ModCore/templates/main.lua"},description='..string.format('%q',description)..'}\n')
 write('enabled.txt','')
 print('Built '..#menu.rows..' settings across Templates and '..#menu.pages..' routed pages')

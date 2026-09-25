@@ -1,5 +1,8 @@
 # Build guide
 
+For the fresh `Scripts/mct/` runtime, use the [menu and lifecycle test command](MENUS.md#tests).
+The previous runtime and its original test setup remain available in Git history.
+
 - [Requirements](#requirements)
 - [Generated menus](#generated-menus)
 - [Offline tests](#offline-tests)
@@ -11,7 +14,8 @@
 - Python 3 for the documented tooling.
 - A compatible UE4SS/Dawnwalker installation for native integration checks.
 
-These are Lua modules; there is no native compilation step in this repository.
+The installed runtime is Lua-only. Optional native-helper sources and their
+separate build instructions are described in [Native startup](NATIVE-STARTUP.md).
 Run the commands below from the repository root.
 
 ## Generated menus
@@ -22,20 +26,20 @@ so settings keep their IDs. Edit template declarations rather than generated pag
 
 ## Offline tests
 
-The [test runner](../tools/run-tests.py) checks runtime Lua syntax and executes
+The [test runner](../tools/run-draft-tests.py) checks runtime Lua syntax and executes
 the test suites from the repository root:
 
 The menu integration suites use the real DMM parser and Settings presentation
 module. Point the following variables at compatible local installations:
 
 ```sh
-export KET_DMM_CHOICES="/path/to/ue4ss/Mods/DawnwalkerModMenu/Scripts/choices.lua"
-export KET_AMM_PRESENTATION="/path/to/ModCoreSettings/Scripts/presentation.lua"
-python3 tools/run-tests.py --lua lua
+export MCT_DMM_CHOICES="/path/to/ue4ss/Mods/DawnwalkerModMenu/Scripts/choices.lua"
+export MCT_PRESENTATION="/path/to/ModCoreSettings/Scripts/presentation.lua"
+python3 tools/run-draft-tests.py --lua lua5.4
 ```
 
-The runner verifies Lua 5.4 and creates local `work` and `outputs` directories.
-An individual suite can be run as `lua tests/<suite>_test.lua`.
+The runner verifies Lua 5.4 and uses a temporary directory for generated test data.
+It runs the current suites in `tests/mct/`.
 
 ## Validation limits
 

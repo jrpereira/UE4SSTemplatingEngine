@@ -1,5 +1,9 @@
 # Developer guide
 
+For the fresh runtime and current `ModCore/` folder layout, see
+[Lifecycle draft](LIFECYCLE-DRAFT.md) and [Template menus](MENUS.md).
+The API examples below document the preceding implementation.
+
 - [Example: replace the quickslots](#example-replace-the-quickslots)
 - [Selection and settings pages](#selection-and-settings-pages)
 - [Template format](#template-format)
@@ -59,9 +63,9 @@ Once templates are loaded, ModCoreTemplates validates them, builds the mod menu 
 
 The `ModCoreTemplates` DMM page always aggregates every loaded template. A template may declare `single = true` or `single = false`; when it omits the field, ModCoreTemplates copies the category's `single` value as its fallback. Templates sharing a category must resolve to the same value. A single category has one template picker. Other categories show one Yes/No picker per template and may activate several templates at once.
 
-Every template declares its menu target with `settings.target`. A `templates` target is routed to a category page, such as `Player Quickslots` or `NPC Attacks`. A `module` target is routed to its source module's page: register it from `<Module>/Scripts/<file>.lua` or `<Module>/Scripts/templates/<file>.lua`, which produces a `<Module>` Mod Menu page. Existing `<Module>/templates/<file>.lua` registrations remain accepted during migration.
+Every template declares its menu target with `settings.target`. A `templates` target is routed to a category page, such as `Player Quickslots` or `NPC Attacks`. A `module` target is routed to its source module's page: register it from `<Module>/ModCore/templates/<file>.lua`, which produces a `<Module>` Mod Menu page. Older registration paths remain accepted during migration.
 
-A provider field with `type = 'navigation'` declares picker choices used only to show and hide other fields. ModCoreTemplates emits it as a DMM picker with `mcNavigation=1`; a tab may also declare `tabNavigation=1` for ModCoreSettings. The generated ID is available in `definition.navigation`, and the row has no config binding. Its value is neither saved in `config.ini` nor passed to template hooks. Other fields may name it in `visibleWhen`. This requires ModCoreSettings's navigation picker support.
+A provider field with `type = 'navigation'` declares picker choices used only to show and hide other fields. ModCoreTemplates emits it as a DMM picker with `mcNavigation=1`; a tab may also declare `tabNavigation=1` for ModCoreSettings. The generated ID is available in `definition.navigation`, and the row has no config binding. Its value is neither saved in `ModCore/cache/config.ini` nor passed to template hooks. Other fields may name it in `visibleWhen`. This requires ModCoreSettings's navigation picker support.
 
 ModCoreControls owns quickslot access methods, action assignment, Tap/Hold bindings, and native input. ModCoreTemplates owns template selection and visual settings. ModCoreControls runs its input host independently of visual template selection; ModCoreTemplates no longer reads ModCoreControls's saved controls or handles ModCoreControls Apply events.
 
@@ -75,7 +79,7 @@ A runtime template needs the following fields (the inert `menu.fixes` exception 
 - `category`: the game feature it replaces.
 - `attach`, `render`, and `detach`: the runtime lifecycle.
 
-Category objects live in `Scripts/categories/*.lua`. ModCoreTemplates loads every category object at startup; each file declares its own `name`, and `single = true` when the category allows one selected template. Other modules can add categories with `ket:loadCategory(name, path)` before loading their templates. ModCoreTemplates generates category controls ahead of template controls. Numeric category settings are editable in DMM, and text settings can be edited in the `[Templates]` section of `config.ini`. ModCoreTemplates passes category values and the selected template's values to visual lifecycle hooks. Player input settings live in ModCoreControls.
+Category objects live in `ModCore/categories/*.lua`. ModCoreTemplates loads every category object at startup; each file declares its own `name`, and `single = true` when the category allows one selected template. Other modules can add categories with `ket:loadCategory(name, path)` before loading their templates. ModCoreTemplates generates category controls ahead of template controls. Numeric category settings are editable in DMM, and text settings can be edited in the `[Templates]` section of `ModCore/cache/config.ini`. ModCoreTemplates passes category values and the selected template's values to visual lifecycle hooks. Player input settings live in ModCoreControls.
 
 A category may define `resolveTarget`, `attach`, and `detach`. ModCoreTemplates calls category `attach(service, target, settings, previousCategoryHandle, template)` before the selected template's `attach`, then passes the returned category handle as the last argument to the template's `attach`, `render`, and `detach`. On a template switch, ModCoreTemplates detaches the old template while keeping the category attached; when the category is cleared, it detaches the template first and the category second. A category author decides what its hooks create, retain, and restore.
 

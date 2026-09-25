@@ -18,3 +18,7 @@ mod_settings.ini
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+# Generated ModCore state; keep the directory in the installed/source layout
+/ModCore/cache/*
+!/ModCore/cache/.gitkeep

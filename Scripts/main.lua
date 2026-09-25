@@ -1,13 +1,24 @@
-local VERSION = '0.0.20'
+-- _ModCore_Templates Lua entry point.
 local source = debug.getinfo(1, 'S').source:gsub('^@', '')
-local scripts = assert(source:match('^(.*)[/\\][^/\\]+$'), 'cannot locate KET Scripts')
-local root = assert(scripts:match('^(.*)[/\\]Scripts$'), 'cannot locate KET module')
+local scripts = assert(source:match('^(.*)[/\\][^/\\]+$'), 'cannot locate MCT Scripts')
+local root = assert(scripts:match('^(.*)[/\\]Scripts$'), 'cannot locate MCT module')
 package.path = scripts .. '/?.lua;' .. package.path
-local function log(message) print('[ModCoreTemplates] ' .. tostring(message) .. '\n') end
-local ok, err = pcall(function()
-    assert(type(ExecuteInGameThread) == 'function', 'game-thread dispatch unavailable')
-    local Settings = require('ket.settings_api')
-    require('ket.menu_host').start(root, Settings, ExecuteInGameThread, log)
-end)
-if not ok then log(VERSION .. ' startup failed: ' .. tostring(err))
-else log(VERSION .. ' loaded; template input activates after a committed Apply') end
+local function listed(directory)
+    local names = assert(loadfile(root .. '/ModCore/' .. directory .. '/index.lua'))()
+    assert(type(names) == 'table', 'invalid ' .. directory .. ' source list')
+    local files, seen = {}, {}
+    for _, name in ipairs(names) do
+        assert(type(name) == 'string' and name:match('^[%w_-]+%.lua$') and not seen[name],
+            'invalid or duplicate ' .. directory .. ' filename')
+        seen[name] = true
+        files[#files+1] = root .. '/ModCore/' .. directory .. '/' .. name
+    end
+    return files
+end
+local bootstrap = require('mct.lua_startup').start({
+    menuRoot = root,
+    categoryFiles = listed('categories'),
+    templateFiles = listed('templates'),
+    settingsApi = require('mct.settings_api'),
+})
+return bootstrap

@@ -1,0 +1,6 @@
+#pragma once
+#include <string_view>
+namespace MCT
+{
+inline constexpr std::string_view loop_start_lua = R"MCT(@MCT_LOOP_START_LUA@)MCT";
+}
