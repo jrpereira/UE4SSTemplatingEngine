@@ -1,33 +1,32 @@
 # MCT lifecycle draft
 
-This is the fresh implementation in `Scripts/mct/`. The previous runtime is preserved in
+This is the fresh implementation in `Scripts/mc/`. The previous runtime is preserved in
 Git history. This draft is executable with a host adapter and
-covered by offline tests. [Template menus](MENUS.md) now reuse the previous menu
-implementation and route committed settings to this lifecycle. The [native startup adapter](NATIVE-STARTUP.md) supplies the all-modules event-loop
-boundary. Native [lifetime references](NATIVE-LIFETIMES.md) now guard identity and callback unwrapping; concrete engine discovery and hierarchy signals remain pending.
+covered by offline tests. [Template menus](MENUS.md) route committed settings
+to this lifecycle. The Lua startup adapter schedules initialization on UE4SS's
+game thread and uses Lua references to check object validity and identity.
 
 ## Startup
 
 1. Load category definitions.
 2. Register MCT's own template files without executing them.
-3. Subscribe to the module-loading-complete / Loop Start barrier.
+3. Schedule the one-shot startup callback on the game thread.
 4. Accept registrations from other modules while waiting.
 5. At the barrier, close registration and execute all registered template files.
 6. Validate definitions, generate menus, restore committed settings and subscribe to Apply.
 7. Subscribe to lifecycle notifications before taking the initial object snapshot.
 8. Process existing objects and then continue through lifecycle events.
 
-`mct.bootstrap.new(options)` implements this sequence. `Scripts/main.lua`
-supplies source-controlled `categoryFiles` and `templateFiles`, and native
-startup supplies the `host` and `subscribeLoopStart(callback)`. Standalone
+`mc.bootstrap.new(options)` implements this sequence. `Scripts/main.lua`
+supplies source-controlled `categoryFiles` and `templateFiles`, and Lua startup
+supplies the `host` and `subscribeLoopStart(callback)`. Standalone
 hosts can supply those options directly, with optional initial
 `selections` and committed `categorySettings`. File lists are explicit; this draft does not search directories.
 `execute(path)` may be supplied for another loader; otherwise it uses `loadfile`.
-Category sources live in `ModCore/categories`; template sources live in
-`ModCore/templates`. Each category/template file returns one definition. The bootstrap object's
-`registerTemplate(path)` accepts external registrations until the barrier fires.
-The barrier must return an unsubscribe function, and must represent completion
-of module registration—not world readiness or a recurring game tick.
+Category sources live in `Scripts/categories`; template sources live in
+`Scripts/templates`. Each category/template file returns one definition. The bootstrap object's
+`registerTemplate(path)` accepts registrations until the startup callback fires.
+The callback subscription must return an unsubscribe function.
 
 Late template registration is rejected explicitly. Duplicate file registrations
 are ignored. Loading errors fail startup before discovery begins.
@@ -87,12 +86,22 @@ return template
 ```
 
 These are plain function calls, not colon methods. All three callbacks are required.
-Templates may import `local MC = require('mct.objects')` for `MC.valid(object)`,
+Templates may import `local MC = require('mc')` for `MC.valid(object)`,
 `MC.same(a, b)`, and `MC.parent(object)`. `parent` returns a valid UMG panel
 parent or nil; it does not traverse UObject outers. `same` compares valid wrappers
 by full name and is not a lifetime token. `MC.call(object, method, ...)` returns
 the first result, or nil when the method throws. Runtime hosts retain their
 additional world/readiness and lifetime checks.
+
+For widget helpers use `local Widget = MC('widget')` or
+`local Widget = MC.load('widget')`. These calls return the same helper module.
+The widget helper includes `appearance(widget, settings, prefix, position)` for
+offset, scale, and opacity fields, plus `reparent(widget, parent)`,
+`measure(widget)`, and `position(widget, bounds, x, y, scale)` for rendered layout.
+From a template entry file, `MC.template('wheels')` loads its sibling
+`mc_wheels.lua` and returns the template table. A name ending in `.lua`, such as
+`MC.template('mc_wheels.lua')`, loads that exact sibling filename. Names cannot
+contain path separators.
 
 All three callbacks receive effective settings: category values overlaid with
 template values, with the template taking precedence. Each callback receives its
@@ -201,14 +210,12 @@ A host must deliver creation events for all possible candidates and explicit
 readiness/parent/loss notifications. Missing notifications cannot be inferred
 without polling; this implementation does not conceal that gap.
 
-## Native integration still to resolve
+## Live integration still to resolve
 
-`Scripts/main.lua` now wires the [native startup helper](NATIVE-STARTUP.md),
-[native lifetime references](NATIVE-LIFETIMES.md), and
-[UE4SS object source](OBJECT-SOURCE.md). A separate live probe verified
-selector resolution and one attachment per root/group-child object. Valid detach, complete parent-change coverage, and
-immediate native loss delivery remain pending. The full draft has not been
-installed over the existing MCT mod. The adapter must clean up any partial
+`Scripts/main.lua` wires the Lua startup adapter and
+[UE4SS object source](OBJECT-SOURCE.md). Valid detach,
+complete parent-change coverage, and timely object-loss delivery remain pending.
+The adapter must clean up any partial
 subscription if `subscribe` fails before returning its unsubscribe function.
 
 UE4SS documents class-construction notifications through
@@ -224,7 +231,7 @@ replacement for the parked runtime.
 ## Validation
 
 ```sh
-python3 tools/run-draft-tests.py --lua lua5.4 \
+python3 tools/run-tests.py --lua lua5.4 \
   --dmm-choices /path/to/DawnwalkerModMenu/Scripts/choices.lua \
   --presentation /path/to/ModCoreSettings/Scripts/presentation.lua
 ```

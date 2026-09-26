@@ -19,6 +19,6 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 
-# Generated ModCore state; keep the directory in the installed/source layout
-/ModCore/cache/*
-!/ModCore/cache/.gitkeep
+# Generated template state; keep the directory in the installed/source layout
+/Scripts/cache/*
+!/Scripts/cache/.gitkeep

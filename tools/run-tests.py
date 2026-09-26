@@ -1,26 +1,33 @@
-"""Run KET's offline Lua suites with an explicitly available Lua 5.4 runtime."""
+"""Validate the active MCT lifecycle runtime and menu integration."""
 import argparse
 import os
-from pathlib import Path
+import tempfile
 import shutil
 import subprocess
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-parser = argparse.ArgumentParser()
-parser.add_argument('--lua', default=os.environ.get('LUA') or shutil.which('lua'))
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--lua', default=shutil.which('lua5.4') or shutil.which('lua'))
+parser.add_argument('--dmm-choices', default=os.getenv('MCT_DMM_CHOICES'))
+parser.add_argument('--presentation', default=os.getenv('MCT_PRESENTATION'))
 args = parser.parse_args()
+if not args.dmm_choices or not args.presentation:
+    parser.error('menu tests require --dmm-choices and --presentation (or MCT_DMM_CHOICES and MCT_PRESENTATION)')
 if not args.lua:
-    parser.error('Lua 5.4 required: pass --lua or set LUA')
-version = subprocess.run([args.lua, '-v'], text=True, capture_output=True, check=True)
+    parser.error('Lua 5.4 required')
+version = subprocess.run([args.lua, '-v'], capture_output=True, text=True, check=True)
 if 'Lua 5.4' not in version.stdout + version.stderr:
     parser.error('Lua 5.4 required')
-for directory in ('work', 'outputs'):
-    (ROOT / directory).mkdir(exist_ok=True)
-files = sorted(ROOT.glob('Scripts/**/*.lua'))
+files = (sorted(ROOT.glob('Scripts/mc/*.lua')) + sorted(ROOT.glob('Scripts/categories/*.lua'))
+         + [ROOT / 'Scripts/mc.lua']
+         + [ROOT / 'Scripts/dmm_extension.lua', ROOT / 'Scripts/main.lua',
+            ROOT / 'Scripts/categories/mc.lua'])
 for path in files:
-    env = dict(os.environ, KET_SYNTAX_FILE=str(path))
-    subprocess.run([args.lua, '-e', 'assert(loadfile(os.getenv("KET_SYNTAX_FILE")))'], cwd=ROOT, env=env, check=True)
-tests = sorted(ROOT.glob('tests/*_test.lua'))
-for path in tests:
-    subprocess.run([args.lua, str(path)], cwd=ROOT, check=True)
-print(f'PASS: {len(files)} source syntax checks, {len(tests)} Lua suites')
+    subprocess.run([args.lua, '-e', 'assert(loadfile(arg[1]))', '-', str(path)], cwd=ROOT, check=True)
+with tempfile.TemporaryDirectory(prefix='mct-menu-tests-') as directory:
+    env = dict(os.environ, MCT_TEST_DIR=directory, MCT_DMM_CHOICES=str(Path(args.dmm_choices).resolve()),
+               MCT_PRESENTATION=str(Path(args.presentation).resolve()))
+    for path in sorted(ROOT.glob('tests/mc/*_test.lua')):
+        subprocess.run([args.lua, str(path)], cwd=ROOT, env=env, check=True)
+print(f'PASS: {len(files)} runtime/category syntax checks')

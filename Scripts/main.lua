@@ -3,22 +3,26 @@ local source = debug.getinfo(1, 'S').source:gsub('^@', '')
 local scripts = assert(source:match('^(.*)[/\\][^/\\]+$'), 'cannot locate MCT Scripts')
 local root = assert(scripts:match('^(.*)[/\\]Scripts$'), 'cannot locate MCT module')
 package.path = scripts .. '/?.lua;' .. package.path
-local function listed(directory)
-    local names = assert(loadfile(root .. '/ModCore/' .. directory .. '/index.lua'))()
-    assert(type(names) == 'table', 'invalid ' .. directory .. ' source list')
+local TemplateDiscovery = require('mc.template_discovery')
+assert(type(IterateGameDirectories)=='function', 'UE4SS directory API unavailable')
+local function listedCategories()
+    local names = assert(loadfile(root .. '/Scripts/categories/mc.lua'))()
+    assert(type(names) == 'table', 'invalid category source list')
     local files, seen = {}, {}
-    for _, name in ipairs(names) do
-        assert(type(name) == 'string' and name:match('^[%w_-]+%.lua$') and not seen[name],
-            'invalid or duplicate ' .. directory .. ' filename')
-        seen[name] = true
-        files[#files+1] = root .. '/ModCore/' .. directory .. '/' .. name
+    for _, entry in ipairs(names) do
+        assert(type(entry)=='string' and entry:match('^[%w_-]+%.lua$'),
+            'invalid category filename')
+        local path=root .. '/Scripts/categories/' .. entry
+        assert(not seen[path], 'duplicate category file: ' .. path)
+        seen[path] = true
+        files[#files+1] = path
     end
     return files
 end
-local bootstrap = require('mct.lua_startup').start({
+local bootstrap = require('mc.lua_startup').start({
     menuRoot = root,
-    categoryFiles = listed('categories'),
-    templateFiles = listed('templates'),
-    settingsApi = require('mct.settings_api'),
+    categoryFiles = listedCategories(),
+    templateFiles = TemplateDiscovery.discover(root, IterateGameDirectories()),
+    settingsApi = require('mc.settings_api'),
 })
 return bootstrap

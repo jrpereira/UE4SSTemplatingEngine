@@ -9,8 +9,7 @@ at the startup barrier, before attaching objects.
 
 ```text
 <Mod>/
-├── Scripts/                  Lua entry points and runtime code
-├── ModCore/
+├── Scripts/                  Lua entry points, runtime code, and mod data
 │   ├── templates/            Template source files
 │   ├── categories/           Category source files
 │   └── cache/
@@ -20,9 +19,9 @@ at the startup barrier, before attaching objects.
 └── mod_settings.ini          Required here for DMM discovery
 ```
 
-Generated files go into `ModCore/cache` unless the host requires another location.
+Generated files go into `Scripts/cache` unless the host requires another location.
 DMM requires its discovery manifest at the mod root, but supports the relative
-`ConfigFile=ModCore/cache/config.ini` path. The cache directory also contains user
+`ConfigFile=Scripts/cache/config.ini` path. The cache directory also contains user
 settings and stable IDs, so its contents must not be discarded as disposable data.
 
 ## Where pages appear
@@ -30,7 +29,7 @@ settings and stable IDs, so its contents must not be discarded as disposable dat
 - **ModCore Templates:** category selectors, template toggles and shared category settings.
 - **Category page:** fields for templates whose menu target is `templates`.
 - **Module page:** fields for templates whose menu target is `module`; the module
-  name comes from the registered `<Module>/ModCore/templates/<file>.lua` path.
+  name comes from the registered `<Module>/Scripts/templates/<file>.lua` path.
 
 Single categories get a template picker with `None`. Other categories get a toggle
 per template. A template with `menu.enabled = false` remains represented in the
@@ -81,15 +80,15 @@ contract. Category `single` controls selection multiplicity.
 
 ## Startup integration
 
-`mct.bootstrap.new` now exposes `menu`, `menuController` and `extension` after its
+`mc.bootstrap.new` now exposes `menu`, `menuController` and `extension` after its
 module-load barrier fires. In addition to the lifecycle host and registration
 options, provide:
 
 | Option | Purpose |
 |---|---|
-| `menuRoot` | Mod root; generated state goes into `ModCore/cache`, with only `mod_settings.ini` at root |
-| `menuShared` | `ModRef` shared-variable interface for the cross-state handoff; native startup supplies it |
-| `settingsApi` | Durable Apply subscriber; the copied client is `require('mct.settings_api')` |
+| `menuRoot` | Mod root; generated state goes into `Scripts/cache`, with only `mod_settings.ini` at root |
+| `menuShared` | `ModRef` shared-variable interface for the cross-state handoff; Lua startup supplies it |
+| `settingsApi` | Durable Apply subscriber; the copied client is `require('mc.settings_api')` |
 | `queue` | Game-thread dispatcher for settings callbacks |
 | `menu` | Generator options, such as `description` or an in-memory identity catalog |
 | `menuValues` | Initial committed setting-ID values for an in-memory host without `menuRoot` |
@@ -97,25 +96,20 @@ options, provide:
 When `menuRoot` is supplied, its saved configuration takes precedence over
 `menuValues`. Missing config keys are added; existing values and unrelated sections
 are preserved. Invalid saved values are reported rather than silently overwritten.
-Startup creates `ModCore/templates`, `ModCore/categories` and `ModCore/cache` as
-needed. Existing root-level `config.ini`, `identity-catalog.lua` and `menu-pages.lua`
-are moved into the cache without changing their contents. If both a legacy file
-and its cache destination exist, startup reports the conflict without overwriting
-either; all conflicts are checked before migration begins. Without `menuRoot`,
+Startup creates `Scripts/templates`, `Scripts/categories` and `Scripts/cache` as
+needed. Generated config, identity catalog, and pages are stored directly in
+`Scripts/cache`. Without `menuRoot`,
 generation and Apply routing work in memory and do not write any files.
 
 For direct in-memory integration, pass `bootstrap.extension` to DMM's extension
 installer once the barrier has completed. It adds generated pages, replaces a module's no-settings placeholder
 when applicable, and handles repeat page builds without duplication. The restored `Scripts/dmm_extension.lua` entry point supports DMM's separate Lua
-state through a lazy reader. [Native startup](NATIVE-STARTUP.md) explains the
-generation handoff and the still-pending native object host.
+state through a lazy reader. The Lua startup adapter supplies the generation handoff.
 
-Saved setting IDs retain the existing `KET_` prefix. Keep the identity catalog:
+Saved setting IDs use `MCT_`. Keep the identity catalog:
 choice numbers and named setting reservations survive subsequent regeneration,
 including adding a template before an existing one. The catalog is persisted before
-manifests using its IDs are written. A preexisting catalog without named reservations
-receives them on its first generation with the new code; no historical named-ID
-mapping can be reconstructed from that older format alone.
+manifests using its IDs are written.
 
 ## Apply behavior
 
@@ -139,7 +133,7 @@ runtime edits with an active menu controller, whose saved snapshot would become 
 ## Tests
 
 ```sh
-python3 tools/run-draft-tests.py --lua lua5.4 \
+python3 tools/run-tests.py --lua lua5.4 \
   --dmm-choices /path/to/DawnwalkerModMenu/Scripts/choices.lua \
   --presentation /path/to/ModCoreSettings/Scripts/presentation.lua
 ```
@@ -147,4 +141,4 @@ python3 tools/run-draft-tests.py --lua lua5.4 \
 The runner uses temporary output directories. It validates generated pages with the
 actual DMM parser and ModCoreSettings presentation code, and exercises Apply routing,
 merged settings, persistence, revisions, subscriptions and lifecycle transitions.
-These offline checks do not establish in-game rendering or native startup timing.
+These offline checks do not establish in-game rendering or startup timing.

@@ -1,0 +1,202 @@
+local Layout = require('mc.layout')
+local Provider = require('mc.provider_settings')
+local M = {}
+
+local function read(path)
+    local file = io.open(path, 'rb')
+    if not file then return nil end
+    local content = file:read('*a')
+    file:close()
+    return content
+end
+
+local function recover(path)
+    local backup,temporary=path..'.mc.bak',path..'.mc.tmp'
+    if read(backup)~=nil then
+        if read(path)==nil then
+            assert(os.rename(backup,path),'could not restore interrupted menu backup: '..path)
+        else
+            -- The replacement was published; only backup removal was interrupted.
+            assert(os.remove(backup),'could not clear completed menu backup: '..backup)
+        end
+    end
+    if read(temporary)~=nil then
+        -- A temporary file was never published. Recreate it from current data.
+        assert(os.remove(temporary),'could not clear interrupted menu temporary: '..temporary)
+    end
+end
+
+local function writeChanged(path, content)
+    recover(path)
+    local old = read(path)
+    if old == content then return false end
+    local temporary = path .. '.mc.tmp'
+    assert(not read(temporary), 'stale temporary menu file: ' .. temporary)
+    local file = assert(io.open(temporary, 'wb'))
+    assert(file:write(content))
+    assert(file:close())
+    local backup = path .. '.mc.bak'
+    if old then
+        assert(not read(backup), 'stale backup menu file: ' .. backup)
+        local moved, why = os.rename(path, backup)
+        if not moved then os.remove(temporary); error(why) end
+    end
+    local renamed, why = os.rename(temporary, path)
+    if not renamed then
+        if old then assert(os.rename(backup, path), 'could not restore previous menu file') end
+        os.remove(temporary)
+        error(why)
+    end
+    if old then assert(os.remove(backup)) end
+    return true
+end
+
+local function pagesSource(pages)
+    local lines = {'return {version=1,pages={'}
+    for _, page in ipairs(pages) do
+        local category = page.category and string.format('%q', page.category) or 'nil'
+        local module = page.module and string.format('%q', page.module) or 'nil'
+        lines[#lines + 1] = string.format('{id=%q,name=%q,category=%s,module=%s,version=%q,manifest=%q},',
+            page.id, page.name, category, module, '0.0.20', page.manifest)
+    end
+    lines[#lines + 1] = '}}\n'
+    return table.concat(lines, '\n')
+end
+
+local function catalogSource(catalog)
+    local lines = {'return {version=1,next=' .. catalog.next .. ',entries={'}
+    local keys = {}
+    for key in pairs(catalog.entries) do keys[#keys + 1] = key end
+    table.sort(keys)
+    for _, key in ipairs(keys) do
+        lines[#lines + 1] = string.format('[%q]=%d,', key, catalog.entries[key])
+    end
+    lines[#lines + 1] = '},names={'
+    keys = {}
+    for key in pairs(catalog.names or {}) do keys[#keys + 1] = key end
+    table.sort(keys)
+    for _, key in ipairs(keys) do
+        lines[#lines + 1] = string.format('[%q]=%q,', key, catalog.names[key])
+    end
+    lines[#lines + 1] = '}}\n'
+    return table.concat(lines, '\n')
+end
+
+function M.readCatalog(root)
+    local path = Layout.prepare(root).catalog
+    recover(path)
+    return read(path) and assert(loadfile(path, 't', {}))() or nil
+end
+
+function M.publish(root, menu)
+    local paths = Layout.prepare(root)
+    -- Reserve IDs durably before any manifest using them is published.
+    writeChanged(paths.catalog, catalogSource(menu.catalog))
+    writeChanged(paths.pages, pagesSource(menu.pages))
+    writeChanged(paths.manifest, menu.aggregate.manifest)
+end
+
+local function ensureConfig(path, rows, textSettings)
+    recover(path)
+    local file = io.open(path, 'rb')
+    local existed = file ~= nil
+    local content = file and file:read('*a') or ''
+    if file then file:close() end
+    content = content:gsub('\r\n', '\n'):gsub('\r', '\n')
+    local lines = {}; for line in (content .. '\n'):gmatch('(.-)\n') do lines[#lines + 1] = line end
+    if lines[#lines] == '' then table.remove(lines) end
+    local section, first, finish, sections, present = nil, nil, nil, 0, {}
+    for index, line in ipairs(lines) do
+        local heading = line:match('^%s*%[([^%]]+)%]%s*$')
+        if heading then
+            if section == 'Templates' and not finish then finish = index end
+            section = heading
+            if heading == 'Templates' then sections = sections + 1; first = first or index end
+        elseif section == 'Templates' then
+            local setting = line:match('^%s*([^=;#]+)%s*=')
+            if setting then
+                setting = setting:match('^%s*(.-)%s*$')
+                assert(not present[setting], 'duplicate Templates config key: ' .. setting)
+                present[setting] = index
+            end
+        end
+    end
+    assert(sections <= 1, 'duplicate Templates config section')
+    if section == 'Templates' and not finish then finish = #lines + 1 end
+    local missing = {}
+    local function accepted(row, value)
+        if not value or value ~= value then return false end
+        if row.Type == 'integer' then
+            return value % 1 == 0 and value >= row.Minimum and value <= row.Maximum
+        end
+        for candidate in row.PresetValues:gmatch('[^|]+') do
+            if value == tonumber(candidate) then return true end
+        end
+        return false
+    end
+    for _, row in ipairs(rows) do
+        if row.mcNavigation ~= 1 then
+            local index = present[row.Id]
+            if not index then
+                local default = tonumber(row.Default)
+                missing[#missing + 1] = row.Id .. '=' .. string.format('%.17g', default)
+            else
+                local raw = lines[index]:match('=%s*([^;#]+)')
+                local value = raw and tonumber(raw:match('^%s*(.-)%s*$'))
+                assert(accepted(row, value), 'invalid saved setting ' .. row.Id)
+            end
+        end
+    end
+    for settingId, spec in pairs(textSettings or {}) do
+        local index = present[settingId]
+        if not index then
+            missing[#missing + 1] = settingId .. '=' .. spec.default
+        else
+            local raw = lines[index]:match('=%s*([^;#]*)')
+            Provider.validateText(spec.format, raw and raw:match('^%s*(.-)%s*$'))
+        end
+    end
+    table.sort(missing)
+    if #missing == 0 and existed then return false end
+    if not first then
+        if #lines > 0 and lines[#lines] ~= '' then lines[#lines + 1] = '' end
+        lines[#lines + 1] = '[Templates]'
+        for _, line in ipairs(missing) do lines[#lines + 1] = line end
+    else
+        for index = #missing, 1, -1 do table.insert(lines, finish, missing[index]) end
+    end
+    local output = table.concat(lines, '\n') .. '\n'
+    return writeChanged(path, output)
+end
+local function readConfigValues(path, textSettings, rows)
+    recover(path)
+    local file = assert(io.open(path, 'rb'), 'missing installed config: ' .. path)
+    local content = file:read('*a'); file:close()
+    local values, section = {}, nil
+    local known = {}
+    for _, row in ipairs(rows) do known[row.Id] = true end
+    for key in pairs(textSettings or {}) do known[key] = true end
+    for line in (content:gsub('\r\n', '\n'):gsub('\r', '\n') .. '\n'):gmatch('(.-)\n') do
+        local heading = line:match('^%s*%[([^%]]+)%]%s*$')
+        if heading then section = heading
+        elseif section == 'Templates' then
+            local key, value = line:match('^%s*([^=;#]+)%s*=%s*([^;#]*)')
+            if key then key = key:match('^%s*(.-)%s*$') end
+            if key and known[key] then
+                value = value:match('^%s*(.-)%s*$')
+                if textSettings and textSettings[key] then
+                    values[key] = Provider.validateText(textSettings[key].format, value)
+                else
+                    value = tonumber(value)
+                    assert(value ~= nil, 'invalid numeric Templates setting: ' .. key)
+                    values[key] = value
+                end
+            end
+        end
+    end
+    return values
+end
+
+M.ensureConfig = ensureConfig
+M.readConfigValues = readConfigValues
+return M

@@ -1,3 +1,0 @@
-return {
-    name = "menu.fixes",
-}

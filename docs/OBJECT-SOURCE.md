@@ -1,26 +1,19 @@
-# UE4SS object source draft
+# UE4SS object source
 
-`Scripts/main.lua` now loads the source-controlled category and MCT template
-lists in `ModCore/categories/index.lua` and `ModCore/templates/index.lua`.
-`mct.native_startup` constructs `mct.widget_source` before subscribing to the
-one-shot Loop Start barrier. Other Lua modules can call
-`MCTRegisterTemplate('<absolute path>/<Module>/ModCore/templates/file.lua')`
-from their `main.lua`; UE4SS injects that function before each module's main
-script. It returns `true` for a new or duplicate registration, or `false, reason`
-when the path is invalid or Loop Start has closed registration. The native
-registry transfers registered paths to MCT once, at Loop Start. Late
-registrations are rejected.
+`Scripts/main.lua` loads category names from `Scripts/categories/mc.lua` and
+uses `mc.template_discovery` to find installed modules with a
+`Scripts/templates` folder. `mc.lua` is the preferred template loader;
+`main.lua` remains supported. `mc.lua_startup` creates the Lua object source
+and reference host, then schedules startup on UE4SS's game thread.
 
-At Loop Start, MCT executes all registered templates, generates the DMM menus,
-restores committed settings and queues the object runtime on the game thread.
 The source subscribes to UE4SS notifications before the runtime's first
-snapshot. The initial snapshot and new-world snapshots use `FindAllOf` only
-once per selector. An unloaded blueprint class may yield `nil`; that means no
-candidates yet. Other changes reevaluate cached candidates.
+snapshot. The initial snapshot and new-world snapshots use `FindAllOf` once
+per selector. An unloaded blueprint class may yield no candidates yet. Other
+changes reevaluate cached candidates.
 
 ## Path matching
 
-`mct.object_selector` interprets class selectors with `IsA` and resolves
+`mc.object_selector` interprets class selectors with `IsA` and resolves
 `WidgetTree` object selectors against a live widget's outer chain. The
 QuickslotsSwitcher selector must have the requested widget class and name,
 its immediate outer must be a live `WidgetTree` instance (`WidgetTree` or
@@ -50,22 +43,10 @@ Non-root widgets require a valid panel parent even when their owner is ready.
 `GetParent` supplies widget ancestry. Other object classes use `GetOuter`.
 Map pre-load makes objects unready and detaches valid attachments; post-load
 invalidates the old set, records the new world and starts one new snapshot.
-The native reference host rejects destroyed objects before any UObject method
-or template callback and never calls `detach` for them.
+Lua references check `IsValid` and object identity before callbacks. A live
+hook survey found `UserWidget:Construct`, `Destruct` and `OnInitialized`
+unavailable to `RegisterHook`. Viewport, parenting and removal hooks registered
+successfully, but direct engine changes can bypass those reflected hooks.
+Group parent changes and timely invalidation remain live validation limits.
 
-A live hook survey on the pinned UE4SS build found `UserWidget:Construct`,
-`Destruct` and `OnInitialized` unavailable to `RegisterHook`. The viewport,
-parenting and removal hooks above registered successfully. These hooks cover
-reflected UMG calls. Direct native C++ calls may bypass a
-UFunction hook, so **group parent changes are not yet guaranteed complete**.
-Native lifetime invalidation is immediate, but the Lua loss queue still needs
-an event-driven wakeup to clear bookkeeping when no other event follows.
-
-A separate read-only probe was exercised in Dawnwalker. After correcting
-live WidgetTree suffix matching, the probe attached once to the
-`QuickslotsSwitcher` and once to its `WBP_HUD_Quickslots` group child.
-`PanelWidget:AddChild` callbacks were observed in gameplay. A later HUD
-replacement produced one attachment for each new object; a valid detach
-was not observed. These limits block a claim of complete lifecycle
-management. The full draft has not replaced the installed MCT mod; the
-probe's enable marker was removed after testing.
+Live gameplay acceptance for the current runtime remains unverified.
