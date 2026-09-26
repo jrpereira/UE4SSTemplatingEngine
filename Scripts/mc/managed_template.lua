@@ -65,7 +65,9 @@ function M.new(template,specs,order)
         local previous=states[root]
         local ok,why=apply(root,targets,params,previous)
         if ok then return true end
-        if previous and not previous.incomplete then
+        -- A failed replacement can retain its own unfinished cleanup. Do not
+        -- overwrite that state while recovering the previous attachment.
+        if previous and not previous.incomplete and states[root]==previous then
             local recovered,reason=apply(root,previous.targets,previous.params,previous)
             if not recovered then why=tostring(why)..'; rollback failed: '..tostring(reason) end
         end

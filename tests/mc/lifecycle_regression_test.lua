@@ -12,7 +12,15 @@ local function object(id)
     function o:GetChildAt(i) return self.children[i+1] end
     function o:AddChild(child)
         self.children[#self.children+1]=child; child.parent=self
-        return object('slot')
+        local slot=object('slot')
+        slot.Padding={Left=0,Top=0,Right=0,Bottom=0}
+        slot.HorizontalAlignment,slot.VerticalAlignment=0,0
+        function slot:SetPadding(value) self.Padding=value end
+        function slot:SetHorizontalAlignment(value) self.HorizontalAlignment=value end
+        function slot:SetVerticalAlignment(value) self.VerticalAlignment=value end
+        function slot:GetClass() return {GetName=function() return 'WidgetSwitcherSlot' end} end
+        child.Slot=slot
+        return slot
     end
     function o:RemoveChild(child)
         for i,v in ipairs(self.children) do
@@ -164,5 +172,28 @@ do
     assert(manager:attach(o,{root=o},{settings={}}))
     assert(not manager:detach(o))
     assert(manager:detach(o) and cleaned==2)
+end
+
+do
+    local live,attempt,releaseAllowed=0,0,false
+    local manager=require('mc.managed_template').new({attach=function(_,params,saved)
+        attempt=attempt+1
+        if attempt==2 then
+            live=live+1
+            params.onCleanup(function()
+                if not releaseAllowed then error('temporary release failure') end
+                live=live-1
+            end)
+            error('update failed after allocating resource')
+        end
+        return saved
+    end},{root={}},{'root'})
+    local o=object('update-root')
+    assert(manager:attach(o,{root=o},{settings={}}))
+    assert(not manager:update(o,{root=o},{settings={changed=1}}))
+    assert(manager:hasState(o))
+    releaseAllowed=true
+    assert(manager:detach(o))
+    assert(live==0,'failed update cleanup was lost during recovery')
 end
 print('PASS: lifecycle regression cases')

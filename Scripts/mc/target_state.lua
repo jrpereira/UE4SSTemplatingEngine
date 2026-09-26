@@ -141,8 +141,9 @@ local function restoreParentRecords(records)
         if changed then
             local slots={}
             for _,child in ipairs(current) do
-                local ok,value=pcall(Widget.snapshotSlot,child)
-                if ok then slots[Objects.call(child,'GetFullName')]=value end
+                -- All remaining siblings are rebuilt below. Capture every
+                -- slot before removing any child, or leave the panel intact.
+                slots[Objects.call(child,'GetFullName')]=Widget.snapshotSlot(child,true)
             end
             plans[#plans+1]={parent=group.parent,desired=desired,slots=slots}
         end

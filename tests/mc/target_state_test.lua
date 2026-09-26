@@ -22,6 +22,7 @@ local function widget(name)
         child.Slot={Padding={Left=0,Top=0,Right=0,Bottom=0},
             HorizontalAlignment=0,VerticalAlignment=0}
         function child.Slot:IsValid() return true end
+        function child.Slot:GetClass() return {GetName=function() return 'WidgetSwitcherSlot' end} end
         function child.Slot:SetPadding(value) self.Padding=value end
         function child.Slot:SetHorizontalAlignment(value) self.HorizontalAlignment=value end
         function child.Slot:SetVerticalAlignment(value) self.VerticalAlignment=value end
@@ -96,3 +97,49 @@ assert(managed:attach(switcher,named,{settings={}}))
 managed:reset()
 assert(active==0,'reset must remove all subscriptions')
 print('PASS: managed cleanup on update, detach, failure, forget and reset')
+
+do
+    local canvas,other=widget('canvas'),widget('other-canvas')
+    canvas.AddChild=function(self,child)
+        self.children[#self.children+1]=child; child.parent=self
+        local slot={LayoutData={Offsets={Left=0,Top=0,Right=0,Bottom=0},
+            Anchors={Minimum={X=0,Y=0},Maximum={X=0,Y=0}},
+            Alignment={X=0,Y=0}},ZOrder=0,bAutoSize=false}
+        function slot:IsValid() return true end
+        function slot:SetLayout(value) self.LayoutData=value end
+        function slot:SetZOrder(value) self.ZOrder=value end
+        function slot:SetAutoSize(value) self.bAutoSize=value end
+        child.Slot=slot
+        return slot
+    end
+    local a,b,c=widget('canvas-a'),widget('canvas-b'),widget('canvas-c')
+    canvas:AddChild(a);canvas:AddChild(b);canvas:AddChild(c)
+    a.Slot.LayoutData.Offsets.Left=123;a.Slot.ZOrder=7;a.Slot.bAutoSize=true
+    local targets,specs,order={b=b},{b={'parent','order'}},{'b'}
+    local saved=State.capture(targets,specs,order)
+    canvas:RemoveChild(b);other:AddChild(b)
+    assert(State.restore(targets,specs,order,saved))
+    assert(canvas:GetChildAt(0)==a and canvas:GetChildAt(1)==b and canvas:GetChildAt(2)==c)
+    assert(a.Slot.LayoutData.Offsets.Left==123 and a.Slot.ZOrder==7 and a.Slot.bAutoSize)
+end
+
+do
+    local unknown,other=widget('unknown-panel'),widget('other-unknown')
+    unknown.AddChild=function(self,child)
+        self.children[#self.children+1]=child;child.parent=self
+        child.Slot={IsValid=function()return true end,UncapturedState=42,
+            Padding={Left=0,Top=0,Right=0,Bottom=0},
+            HorizontalAlignment=0,VerticalAlignment=0,
+            GetClass=function() return {GetName=function() return 'HorizontalBoxSlot' end} end}
+        return child.Slot
+    end
+    local a,b,c=widget('unknown-a'),widget('unknown-b'),widget('unknown-c')
+    unknown:AddChild(a);unknown:AddChild(b);unknown:AddChild(c)
+    local targets,specs,order={b=b},{b={'parent','order'}},{'b'}
+    local saved=State.capture(targets,specs,order)
+    unknown:RemoveChild(b);other:AddChild(b)
+    local ok=pcall(State.restore,targets,specs,order,saved)
+    assert(not ok,'unknown slot must not be silently rebuilt')
+    assert(unknown:GetChildAt(0)==a and unknown:GetChildAt(1)==c
+        and a.Slot.UncapturedState==42)
+end
