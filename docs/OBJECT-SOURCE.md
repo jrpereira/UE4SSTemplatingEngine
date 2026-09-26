@@ -43,7 +43,12 @@ Non-root widgets require a valid panel parent even when their owner is ready.
 `GetParent` supplies widget ancestry. Other object classes use `GetOuter`.
 Map pre-load makes objects unready and detaches valid attachments; post-load
 invalidates the old set, records the new world and starts one new snapshot.
-Lua references check `IsValid` and object identity before callbacks. A live
+Lua references check `IsValid` and object identity before callbacks. Identity
+includes the UE4SSLuaEventBridge object lifetime token, which distinguishes a
+reused address and full name through Unreal's object-item serial. The bridge
+must expose API 5 and `object_lifetimes`; a failed native ABI probe prevents
+MCT startup. If lifetime capture later fails, the source stops accepting that
+object and reports the failure once. A live
 hook survey found `UserWidget:Construct`, `Destruct` and `OnInitialized`
 unavailable to `RegisterHook`. Viewport, parenting and removal hooks registered
 successfully, but direct engine changes can bypass those reflected hooks.

@@ -5,7 +5,10 @@ local Runtime=require('mc.runtime')
 local objectPath='WidgetSwitcher /Game/HUD/WBP_GameHUD.WBP_GameHUD_C:WidgetTree.QuickslotsSwitcher'
 local classPath='/Game/HUD/WBP_GameHUD.WBP_GameHUD_C'
 local all,created,hooks,finds={}, {}, {}, 0
+local nextSerial,serialByAddress=0,{}
 local function obj(address,full,classes,outer)
+    nextSerial=nextSerial+1
+    serialByAddress[address]=nextSerial
     local o={address=address,full=full,classes=classes or {},outer=outer,alive=true}
     function o:GetAddress() return self.address end
     function o:IsValid() return self.alive end
@@ -34,6 +37,15 @@ local child=obj(13,'SlotWidget /Engine/Transient.GameEngine_0.WBP_GameHUD_C_1.Wi
     {['/Script/UMG.Widget']=true,['/Script/UMG.SlotWidget']=true},tree)
 child.class=slotClass
 local api={}
+local sourceErrors={}
+api.MCTOnError=function(error) sourceErrors[#sourceErrors+1]=error end
+api.UE4SSLuaEventBridge={API_VERSION=5,
+    GetCapabilities=function() return {api=5,object_lifetimes=true} end,
+    lifetimes={captureObject=function(value)
+        local serial=serialByAddress[value.address]
+        return serial and tostring(serial) or nil,'native lifetime unavailable'
+    end,
+        valid=function() return true end}}
 function api.StaticFindObject(path)
     if path~='/Script/UMG.Default__WidgetLayoutLibrary' then return nil end
     return {IsValid=function() return true end,
@@ -58,6 +70,18 @@ function api.RegisterLoadMapPreHook(callback) api.mapPre=callback end
 function api.RegisterLoadMapPostHook(callback) api.mapPost=callback end
 local category={name='quickslots',targets={switcher={object=objectPath},slots={class='/Script/UMG.SlotWidget',within='switcher'}}}
 local source=Source.new({category},api)
+do
+    local unavailable={}
+    for key,value in pairs(api) do unavailable[key]=value end
+    unavailable.UE4SSLuaEventBridge=nil
+    assert(not pcall(Source.new,{category},unavailable),
+        'identity source must fail closed without serial-backed lifetimes')
+    unavailable.UE4SSLuaEventBridge={API_VERSION=5,
+        GetCapabilities=function()return {api=5,object_lifetimes=false}end,
+        lifetimes=api.UE4SSLuaEventBridge.lifetimes}
+    assert(not pcall(Source.new,{category},unavailable),
+        'failed native ABI probe must prevent attachment')
+end
 assert(created[classPath] and created['/Script/UMG.WidgetSwitcher'] and created['/Script/UMG.SlotWidget'])
 local host=References.new(source)
 local calls={}
@@ -137,6 +161,22 @@ hooks['/Script/UMG.UserWidget:AddToViewport'].post(wrap(nextOwner))
 assert(#calls==5 and calls[5][2]==nextRoot)
 runtime:stop(); source.stop()
 assert(next(hooks)==nil)
+do
+    local old=assert(host.capture(nextRoot))
+    local oldId=host.identity(old)
+    local replacement=obj(nextRoot.address,nextRoot.full,nextRoot.classes,nextTree)
+    replacement.class=widgetClass
+    nextOwner.WidgetTree.RootWidget=replacement
+    local newer=assert(host.capture(replacement))
+    assert(host.identity(newer)~=oldId,
+        'same-map address and full-name reuse must receive a new identity')
+    assert(not host.valid(old) and newer~=old)
+    local currentSerial=serialByAddress[replacement.address]
+    serialByAddress[replacement.address]=nil
+    assert(not host.valid(newer),'native lifetime failure must invalidate the reference')
+    assert(#sourceErrors==1 and sourceErrors[1].stage=='identity')
+    serialByAddress[replacement.address]=currentSerial
+end
 local singleton=Source.new({{name='singleton',targets={switcher={object=objectPath}}}},api)
 assert(hooks['/Script/UMG.PanelWidget:AddChild']) -- leaf can join after creation
 singleton.stop()

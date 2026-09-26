@@ -22,6 +22,18 @@ function M.new(categories, api)
         'RegisterLoadMapPreHook','RegisterLoadMapPostHook','IsInGameThread'}) do
         assert(type(api[name]) == 'function', 'UE4SS object source requires ' .. name)
     end
+    local bridge=api.UE4SSLuaEventBridge
+    local lifetimes=type(bridge)=='table' and bridge.lifetimes or nil
+    local ok,caps=false,nil
+    if type(bridge)=='table' and type(bridge.GetCapabilities)=='function' then
+        ok,caps=pcall(bridge.GetCapabilities)
+    end
+    -- The source must not attach to a recycled address/name without a native
+    -- serial. The bridge enables this capability only after its ABI probe.
+    assert(ok and type(caps)=='table' and caps.object_lifetimes==true
+        and tonumber(caps.api or 0)>=5 and tonumber(bridge.API_VERSION or 0)>=5
+        and type(lifetimes)=='table' and type(lifetimes.captureObject)=='function',
+        'MCT requires UE4SSLuaEventBridge API 5 object lifetimes')
     local source = {}
     local selectors, notifyClasses, hasGroups, hasWidgets = {}, {}, false, false
     for _, category in ipairs(categories) do
@@ -47,6 +59,7 @@ function M.new(categories, api)
     local built = {}
     local sink, getEpoch, subscribed, active = nil, nil, false, true
     local loading, currentWorld, generation = false, nil, 1
+    local identityFailureReported=false
     local hooks = {}
     local function errorReport(stage, message)
         local error = {stage=stage,message=tostring(message)}
@@ -70,7 +83,15 @@ function M.new(categories, api)
         if type(address) ~= 'number' then return nil end
         local name = safe(object,'GetFullName')
         if type(name) ~= 'string' then return nil end
-        return tostring(generation) .. ':' .. tostring(address) .. ':' .. name
+        local captured,lifetime,why=pcall(lifetimes.captureObject,object)
+        if not captured or type(lifetime)~='string' then
+            if not identityFailureReported then
+                identityFailureReported=true
+                errorReport('identity',captured and (why or 'native lifetime unavailable') or lifetime)
+            end
+            return nil
+        end
+        return tostring(generation) .. ':' .. lifetime .. ':' .. tostring(address) .. ':' .. name
     end
     source.identity = token
     local function world(object)
